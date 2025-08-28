@@ -10,7 +10,10 @@ const server = fastify({});
 const { REDIS_HOST, REDIS_PORT, ORIGIN, OMEKA_API } = process.env;
 
 await server.register(cors, {
-  origin: ORIGIN?.split(",").map((d) => d.trim()),
+  origin: ORIGIN.match(/(?:\/.*?\/|[^,])+/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((str) => new RegExp(str.replace(/^\//, "").replace(/\/$/, ""))),
 });
 
 // Redis setup
