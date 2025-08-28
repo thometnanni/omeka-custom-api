@@ -37,7 +37,7 @@ server.all("/flush", async () => {
 });
 
 // Declare a route
-server.get("/omeka-api/*", async function handler(req, reply) {
+server.get("/omeka/*", async function handler(req, reply) {
   const path = req.params["*"];
   const query = new URLSearchParams(req.query).toString();
   const url = `${OMEKA_API}/${path}?${query}`;
