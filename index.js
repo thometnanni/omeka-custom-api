@@ -2,21 +2,22 @@ import dotenv from "dotenv";
 import { createClient } from "redis";
 import cors from "@fastify/cors";
 import fastify from "fastify";
+import { parseOrigin, makeCacheKey } from "./utils.js";
 
-// Load environment variables from .env into process.env
+// ---
+// SETUP
+// ---
+// ENV
 dotenv.config();
+const {
+  REDIS_HOST = "localhost",
+  REDIS_PORT = 6379,
+  ORIGIN,
+  OMEKA_API,
+  API_PORT = 3000,
+} = process.env;
 
-const server = fastify({});
-const { REDIS_HOST, REDIS_PORT, ORIGIN, OMEKA_API } = process.env;
-
-await server.register(cors, {
-  origin: ORIGIN.match(/(?:\/.*?\/|[^,])+/g)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((str) => new RegExp(str.replace(/^\//, "").replace(/\/$/, ""))),
-});
-
-// Redis setup
+// REDIS
 const redisClient = createClient({
   host: REDIS_HOST,
   port: REDIS_PORT,
@@ -24,20 +25,23 @@ const redisClient = createClient({
 redisClient.on("error", (err) => console.error("Redis Client Error", err));
 redisClient.connect();
 
-// Helper: cache key based on method + URL + query/body
-function makeCacheKey(req) {
-  const base = req.originalUrl;
-  const body = req.method === "GET" ? "" : JSON.stringify(req.body);
-  return `${req.method}:${base}:${Buffer.from(body).toString("base64")}`;
-}
+// FASTIFY+CORS
+const server = fastify({});
+await server.register(cors, {
+  origin: parseOrigin(ORIGIN),
+});
 
+// ---
+// ROUTES
+// ---
+// FLUSH
 server.all("/flush", async () => {
   await redisClient.flushAll();
   return { status: "Cache flushed" };
 });
 
-// Declare a route
-server.get("/omeka/*", async function handler(req, reply) {
+// PASS THROUGH
+server.get("/omeka/*", async (req, res) => {
   const path = req.params["*"];
   const query = new URLSearchParams(req.query).toString();
   const url = `${OMEKA_API}/${path}?${query}`;
@@ -55,17 +59,19 @@ server.get("/omeka/*", async function handler(req, reply) {
 
   const data = await response.json();
 
-  await redisClient.setEx(cacheKey, 600, JSON.stringify(data));
+  await redisClient.setEx(cacheKey, 60 * 60, JSON.stringify(data));
 
-  reply
+  res
     .code(response.status)
     .header("Content-Type", "application/json; charset=utf-8")
     .send(data);
 });
 
-// Run the server!
+// ---
+// START SERVER
+// ---
 try {
-  await server.listen({ port: 3000 });
+  await server.listen({ port: API_PORT });
 } catch (err) {
   server.log.error(err);
   process.exit(1);
