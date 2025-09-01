@@ -32,22 +32,15 @@ await server.register(cors, {
 });
 
 // ---
-// ROUTES
+// QUERIES
 // ---
-// FLUSH
-server.all("/flush", async () => {
-  await redisClient.flushAll();
-  return { status: "Cache flushed" };
-});
-
-// CUSTOM
-server.get("/filters", async (req, res) => {
-  const cached = await redisClient.get("/filters");
+// ALL ITEMS
+async function getAllItems() {
+  const cached = await redisClient.get("allItems");
   if (cached) return JSON.parse(cached);
-
   const allItems = [];
   let page = 1;
-  const perPage = 100; // reasonable batch size
+  const perPage = 100;
 
   while (true) {
     const response = await fetch(
@@ -55,33 +48,58 @@ server.get("/filters", async (req, res) => {
     );
     const data = await response.json();
 
-    if (data.length === 0) break; // no more items
+    if (data.length === 0) break;
 
     allItems.push(...data);
     console.log(`Fetched page ${page}, total items so far: ${allItems.length}`);
 
     page++;
 
-    // Optional: small delay to be extra nice to the server
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  await redisClient.setEx("allItems", 60 * 60, JSON.stringify(allItems));
+  return allItems;
+}
+
+// FILTER: YEARS
+async function getFilterYears() {
+  const allItems = await getAllItems();
   const years = {};
 
   allItems.forEach((item) => {
-    console.log(item["dcterms:date"]);
     const year = item["dcterms:date"]?.[0]?.["@value"]?.split("-")[0];
     if (!year) return;
 
     years[year] = 1 + (years[year] ?? 0);
   });
 
-  const filters = {
-    years,
-  };
-  await redisClient.setEx("/filters", 60 * 60 * 12, JSON.stringify(filters));
+  return years;
+}
 
-  return filters;
+// FILTERS
+async function getFilters() {
+  const cached = await redisClient.get("/filters");
+  if (cached) return JSON.parse(cached);
+  const filters = {
+    years: await getFilterYears(),
+  };
+  await redisClient.setEx("/filters", 60 * 60 * 24, JSON.stringify(filters));
+}
+
+// ---
+// ROUTES
+// ---
+// FLUSH
+server.all("/flush", async () => {
+  await redisClient.flushAll();
+  preload();
+  return { status: "Cache flushed" };
+});
+
+// CUSTOM
+server.get("/filters", async (req, res) => {
+  return await getFilters();
 });
 
 // PASS THROUGH
@@ -114,7 +132,15 @@ server.get("/omeka/*", async (req, res) => {
 // ---
 // START SERVER
 // ---
+
+async function preload() {
+  await getAllItems();
+  await getFilters();
+}
+
 try {
+  await preload();
+  setInterval(preload, 23 * 60 * 60 * 1000);
   await server.listen({ port: API_PORT });
 } catch (err) {
   server.log.error(err);
