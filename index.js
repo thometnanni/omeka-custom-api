@@ -79,9 +79,9 @@ async function getFilterYears() {
 }
 
 // FILTERS
-async function getFilters() {
+async function getFilters(force = false) {
   const cached = await redisClient.get("/filters");
-  if (cached) return JSON.parse(cached);
+  if (cached && !force) return JSON.parse(cached);
   const filters = {
     years: await getFilterYears(),
   };
@@ -171,17 +171,25 @@ server.get("/omeka/*", async (req, res) => {
 });
 
 // ---
-// START SERVER
+// PRELOAD
 // ---
 
 async function preload() {
-  await getAllItems();
-  await getFilters();
+  preloadFilters();
 }
+
+async function preloadFilters(force = false) {
+  await getFilters(force);
+  const ttl = redisClient.ttl("/filters");
+  setTimeout(preloadFilters, ttl * 0.95, true);
+}
+
+// ---
+// START SERVER
+// ---
 
 try {
   await preload();
-  setInterval(preload, 23 * 60 * 60 * 1000);
   await server.listen({ port: API_PORT });
 } catch (err) {
   server.log.error(err);
