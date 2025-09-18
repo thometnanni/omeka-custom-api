@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { createClient } from "redis";
 import cors from "@fastify/cors";
 import fastify from "fastify";
+import Parser from "rss-parser";
 import { parseOrigin, makeCacheKey } from "./utils.js";
 
 // ---
@@ -88,6 +89,40 @@ async function getFilters() {
   return filters;
 }
 
+// NEWSLETTERS
+async function getNewsletters() {
+  const cached = await redisClient.get("/newsletters");
+  if (cached) return JSON.parse(cached);
+
+  const parser = new Parser({
+    customFields: {
+      item: ["description"],
+    },
+  });
+  const feed = await parser.parseURL(
+    "https://chinaunofficialarchives.substack.com/feed"
+  );
+
+  const newsletters = {
+    url: feed.link,
+    items: feed.items.map((item) => ({
+      title: {
+        zh: item.title,
+        en: item.description,
+      },
+      date: item.isoDate,
+      url: item.url,
+      image: item.enclosure?.url,
+    })),
+  };
+  await redisClient.setEx(
+    "/newsletters",
+    60 * 60 * 24,
+    JSON.stringify(newsletters)
+  );
+  return newsletters;
+}
+
 // ---
 // ROUTES
 // ---
@@ -101,6 +136,11 @@ server.all("/flush", async () => {
 // CUSTOM
 server.get("/filters", async (req, res) => {
   return await getFilters();
+});
+
+// CUSTOM
+server.get("/newsletters", async (req, res) => {
+  return await getNewsletters();
 });
 
 // PASS THROUGH
