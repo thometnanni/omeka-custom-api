@@ -3,8 +3,12 @@ import { createClient } from "redis";
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import Parser from "rss-parser";
-import { parseOrigin, makeCacheKey } from "./utils.js";
-
+import {
+  parseOrigin,
+  makeCacheKey,
+  flattenProperty,
+  localizeObject,
+} from "./utils.js";
 // ---
 // SETUP
 // ---
@@ -123,6 +127,27 @@ async function getNewsletters() {
   return newsletters;
 }
 
+// FEATURED
+async function getFeatured() {
+  const cached = await redisClient.get("/featured");
+  if (cached) return JSON.parse(cached);
+  const featured = await fetch(
+    "https://minjian-danganguan.org/api/items?item_set_id=4322"
+  ).then((d) =>
+    d.json().then((items) => {
+      return items.map((item) => ({
+        id: item["o:id"],
+        title: flattenProperty(item["dcterms:title"]),
+        type: flattenProperty(item["dcterms:type"]),
+        thumbnail: item.thumbnail_display_urls?.medium,
+      }));
+    })
+  );
+
+  await redisClient.setEx("/featured", 60 * 60 * 24, JSON.stringify(featured));
+  return featured;
+}
+
 // ---
 // ROUTES
 // ---
@@ -138,9 +163,12 @@ server.get("/filters", async (req, res) => {
   return await getFilters();
 });
 
-// CUSTOM
 server.get("/newsletters", async (req, res) => {
   return await getNewsletters();
+});
+
+server.get("/featured", async (req, res) => {
+  return localizeObject(await getFeatured(), req.query?.lang);
 });
 
 // PASS THROUGH
@@ -180,7 +208,7 @@ async function preload() {
 
 async function preloadFilters(force = false) {
   await getFilters(force);
-  const ttl = redisClient.ttl("/filters");
+  const ttl = await redisClient.ttl("/filters");
   setTimeout(preloadFilters, ttl * 0.95, true);
 }
 
