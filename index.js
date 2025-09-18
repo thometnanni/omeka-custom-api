@@ -85,6 +85,7 @@ async function getFilters() {
     years: await getFilterYears(),
   };
   await redisClient.setEx("/filters", 60 * 60 * 24, JSON.stringify(filters));
+  return filters;
 }
 
 // ---
