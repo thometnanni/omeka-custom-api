@@ -3,12 +3,14 @@ import { createClient } from "redis";
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import Parser from "rss-parser";
+import he from "he";
 import {
   parseOrigin,
   makeCacheKey,
   flattenProperty,
   localizeObject,
 } from "./utils.js";
+
 // ---
 // SETUP
 // ---
@@ -111,8 +113,8 @@ async function getNewsletters() {
     url: feed.link,
     items: feed.items.map((item) => ({
       title: {
-        zh: item.title,
-        en: item.description,
+        zh: he.decode(item.title),
+        en: he.decode(item.description),
       },
       date: item.isoDate,
       url: item.link,
