@@ -115,7 +115,7 @@ async function getNewsletters() {
         en: item.description,
       },
       date: item.isoDate,
-      url: item.url,
+      url: item.link,
       image: item.enclosure?.url,
     })),
   };
@@ -164,7 +164,7 @@ server.get("/filters", async (req, res) => {
 });
 
 server.get("/newsletters", async (req, res) => {
-  return await getNewsletters();
+  return localizeObject(await getNewsletters(), req.query?.lang);
 });
 
 server.get("/featured", async (req, res) => {
