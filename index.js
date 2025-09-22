@@ -133,21 +133,39 @@ async function getNewsletters() {
 async function getFeatured() {
   const cached = await redisClient.get("/featured");
   if (cached) return JSON.parse(cached);
-  const featured = await fetch(
-    "https://minjian-danganguan.org/api/items?item_set_id=4322"
-  ).then((d) =>
-    d.json().then((items) => {
-      return items.map((item) => ({
-        id: item["o:id"],
-        title: flattenProperty(item["dcterms:title"]),
-        type: flattenProperty(item["dcterms:type"]),
-        thumbnail: item.thumbnail_display_urls?.medium,
-      }));
-    })
+  const featured = await fetch(`${OMEKA_API}/items?item_set_id=4322`).then(
+    (d) =>
+      d.json().then((items) => {
+        return items.map((item) => ({
+          id: item["o:id"],
+          title: flattenProperty(item["dcterms:title"]),
+          type: flattenProperty(item["dcterms:type"]),
+          thumbnail: item.thumbnail_display_urls?.medium,
+        }));
+      })
   );
 
   await redisClient.setEx("/featured", 60 * 60 * 24, JSON.stringify(featured));
   return featured;
+}
+
+// FEATURED
+async function getSplashImages() {
+  const cached = await redisClient.get("/splash-images");
+  if (cached) return JSON.parse(cached);
+  const splashImages = await fetch(`${OMEKA_API}/items?item_set_id=4329`).then(
+    (d) =>
+      d.json().then((items) => {
+        return items.map((item) => item.thumbnail_display_urls?.large);
+      })
+  );
+
+  await redisClient.setEx(
+    "/splash-images",
+    60 * 60 * 24 * 7,
+    JSON.stringify(splashImages)
+  );
+  return splashImages;
 }
 
 // ---
@@ -171,6 +189,10 @@ server.get("/newsletters", async (req, res) => {
 
 server.get("/featured", async (req, res) => {
   return localizeObject(await getFeatured(), req.query?.lang);
+});
+
+server.get("/splash-images", async (req, res) => {
+  return await getSplashImages();
 });
 
 // PASS THROUGH
