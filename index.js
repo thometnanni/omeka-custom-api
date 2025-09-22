@@ -81,7 +81,38 @@ async function getFilterYears() {
     years[year] = 1 + (years[year] ?? 0);
   });
 
-  return years;
+  const structuredYears = Object.entries(years)
+    .map(([value, count]) => ({
+      value,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  return structuredYears;
+}
+
+// FILTER: BY TYPE
+async function getFilterByType(type, relation) {
+  const allItems = await getAllItems();
+
+  const creators = allItems
+    .filter((item) => item["@type"].includes(type))
+    .map((item) => {
+      const title = flattenProperty(item["dcterms:title"]);
+      const id = item["o:id"];
+      const count = allItems.filter((item) =>
+        item[relation]?.find((creator) => creator.value_resource_id === id)
+      ).length;
+      return {
+        id,
+        title,
+        count,
+      };
+    })
+    .filter(({ count }) => count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  return creators;
 }
 
 // FILTERS
@@ -90,6 +121,10 @@ async function getFilters(force = false) {
   if (cached && !force) return JSON.parse(cached);
   const filters = {
     years: await getFilterYears(),
+    creators: await getFilterByType("foaf:Person", "dcterms:creator"),
+    types: await getFilterByType("skos:Concept", "curation:category"),
+    themes: await getFilterByType("dctype:Collection", "curation:theme"),
+    eras: await getFilterByType("dctype:Event", "dcterms:coverage"),
   };
   await redisClient.setEx("/filters", 60 * 60 * 24, JSON.stringify(filters));
   return filters;
@@ -149,7 +184,7 @@ async function getFeatured() {
   return featured;
 }
 
-// FEATURED
+// SPASH IMAGE
 async function getSplashImages() {
   const cached = await redisClient.get("/splash-images");
   if (cached) return JSON.parse(cached);
@@ -168,6 +203,27 @@ async function getSplashImages() {
   return splashImages;
 }
 
+// ITEMS
+async function getItems() {
+  const cached = await redisClient.get("/items");
+  if (cached) return JSON.parse(cached);
+  const items = await fetch(
+    `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=100`
+  ).then((d) =>
+    d.json().then((items) => {
+      return items.map((item) => ({
+        id: item["o:id"],
+        title: flattenProperty(item["dcterms:title"]),
+        type: flattenProperty(item["dcterms:type"]),
+        thumbnail: item.thumbnail_display_urls?.medium,
+      }));
+    })
+  );
+
+  await redisClient.setEx("/items", 60 * 60, JSON.stringify(items));
+  return items;
+}
+
 // ---
 // ROUTES
 // ---
@@ -180,7 +236,7 @@ server.all("/flush", async () => {
 
 // CUSTOM
 server.get("/filters", async (req, res) => {
-  return await getFilters();
+  return localizeObject(await getFilters(), req.query?.lang);
 });
 
 server.get("/newsletters", async (req, res) => {
@@ -193,6 +249,10 @@ server.get("/featured", async (req, res) => {
 
 server.get("/splash-images", async (req, res) => {
   return await getSplashImages();
+});
+
+server.get("/items", async (req, res) => {
+  return localizeObject(await getItems(), req.query?.lang);
 });
 
 // PASS THROUGH

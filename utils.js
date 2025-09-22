@@ -15,10 +15,11 @@ export function makeCacheKey(req) {
 export function flattenProperty(property) {
   if (Array.isArray(property) && property.length > 1) {
     return Object.fromEntries(
-      property.map((p) => [p["@language"], p["@value"]])
+      property.map((p) => [p["@language"], p["@value"].trim?.()] ?? p["@value"])
     );
   }
-  return property[0]?.["@value"] ?? property["@value"] ?? property;
+  const value = property?.[0]?.["@value"] ?? property?.["@value"] ?? property;
+  return value?.trim?.() ?? value;
 }
 
 export function localizeObject(obj, lang) {
