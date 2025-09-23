@@ -22,6 +22,22 @@ export function flattenProperty(property) {
   return value?.trim?.() ?? value;
 }
 
+export function flattenLinkedProperties(item, types, filters) {
+  return Object.fromEntries(
+    Object.entries(types).map(([name, type]) => {
+      const values = item[type.property]?.map(({ value_resource_id }) => {
+        const { title, id } =
+          filters[name]?.find(({ id }) => id === value_resource_id) ?? {};
+        return {
+          title,
+          id,
+        };
+      });
+      return [name, values];
+    })
+  );
+}
+
 export function localizeObject(obj, lang) {
   if (lang == null) return obj;
   if (!obj || typeof obj !== "object") {
