@@ -38,6 +38,20 @@ export function flattenLinkedProperties(item, types, filters) {
   );
 }
 
+export function flattenType(item, types) {
+  const term = item["@type"]?.find((type) =>
+    Object.values(types)
+      .map(({ term }) => term)
+      .includes(type)
+  );
+
+  const type = Object.entries(types).find(
+    ([, type]) => type.term === term
+  )?.[0];
+
+  return type ?? "object";
+}
+
 export function localizeObject(obj, lang) {
   if (lang == null) return obj;
   if (!obj || typeof obj !== "object") {

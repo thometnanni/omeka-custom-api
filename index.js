@@ -10,6 +10,7 @@ import {
   flattenProperty,
   localizeObject,
   flattenLinkedProperties,
+  flattenType,
 } from "./utils.js";
 
 // ---
@@ -27,7 +28,7 @@ const {
 
 const types = {
   creator: { term: "foaf:Person", property: "dcterms:creator" },
-  type: { term: "skos:Concept", property: "curation:category" },
+  objectType: { term: "skos:Concept", property: "curation:category" },
   theme: { term: "dctype:Collection", property: "curation:theme" },
   era: { term: "dctype:Event", property: "dcterms:coverage" },
 };
@@ -131,7 +132,7 @@ async function getFilters(force = false) {
   const filters = {
     year: await getFilterYears(),
     creator: await getFilterByType("creator"),
-    type: await getFilterByType("type"),
+    objectType: await getFilterByType("objectType"),
     theme: await getFilterByType("theme"),
     era: await getFilterByType("era"),
   };
@@ -183,6 +184,7 @@ async function getFeatured() {
       d.json().then((items) => {
         return items.map((item) => ({
           id: item["o:id"],
+          type: flattenType(item, types),
           title: flattenProperty(item["dcterms:title"]),
           ...flattenLinkedProperties(item, types, filters),
           thumbnail: item.thumbnail_display_urls?.medium,
@@ -224,6 +226,7 @@ async function getItems() {
     d.json().then((items) => {
       return items.map((item) => ({
         id: item["o:id"],
+        type: flattenType(item, types),
         title: flattenProperty(item["dcterms:title"]),
         ...flattenLinkedProperties(item, types, filters),
         thumbnail: item.thumbnail_display_urls?.medium,
@@ -244,6 +247,7 @@ async function getItem(id) {
     d.json().then((item) => {
       return {
         id: item["o:id"],
+        type: flattenType(item, types),
         title: flattenProperty(item["dcterms:title"]),
         titleAlt: flattenProperty(item["dcterms:alternative"]),
         description: flattenProperty(item["dcterms:description"]),
