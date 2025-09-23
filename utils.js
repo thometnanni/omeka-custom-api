@@ -39,7 +39,7 @@ export function flattenLinkedProperties(item, types, filters) {
 }
 
 export function flattenType(item, types) {
-  const term = item["@type"]?.find((type) =>
+  const term = [item["@type"]]?.flat()?.find((type) =>
     Object.values(types)
       .map(({ term }) => term)
       .includes(type)
