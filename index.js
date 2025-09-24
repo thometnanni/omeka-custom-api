@@ -11,6 +11,7 @@ import {
   localizeObject,
   flattenLinkedProperties,
   flattenType,
+  filterQuery,
 } from "./utils.js";
 
 // ---
@@ -220,19 +221,21 @@ async function getItems() {
   const cached = await redisClient.get("/items");
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
-  const items = await fetch(
-    `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=100`
-  ).then((d) =>
-    d.json().then((items) => {
-      return items.map((item) => ({
-        id: item["o:id"],
-        type: flattenType(item, types),
-        title: flattenProperty(item["dcterms:title"]),
-        ...flattenLinkedProperties(item, types, filters),
-        thumbnail: item.thumbnail_display_urls?.medium,
-      }));
-    })
-  );
+  const items = {
+    items: await fetch(
+      `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=100`
+    ).then((d) =>
+      d.json().then((items) => {
+        return items.map((item) => ({
+          id: item["o:id"],
+          type: flattenType(item, types),
+          title: flattenProperty(item["dcterms:title"]),
+          ...flattenLinkedProperties(item, types, filters),
+          thumbnail: item.thumbnail_display_urls?.medium,
+        }));
+      })
+    ),
+  };
 
   await redisClient.setEx("/items", 60 * 60, JSON.stringify(items));
   return items;
@@ -243,7 +246,7 @@ async function getItem(id) {
   const cached = await redisClient.get(`/item/${id}`);
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
-  const items = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
+  const item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
     d.json().then((item) => {
       return {
         id: item["o:id"],
@@ -258,8 +261,26 @@ async function getItem(id) {
     })
   );
 
-  await redisClient.setEx(`/item/${id}`, 60 * 60 * 12, JSON.stringify(items));
-  return items;
+  if (Object.keys(types).includes(item.type)) {
+    const type = Object.entries(types).find(([key]) => key === item.type)[1];
+    const items = await fetch(
+      `${OMEKA_API}/items?${filterQuery(type.property, item.id)}`
+    ).then((d) =>
+      d.json().then((items) => {
+        return items.map((item) => ({
+          id: item["o:id"],
+          type: flattenType(item, types),
+          title: flattenProperty(item["dcterms:title"]),
+          ...flattenLinkedProperties(item, types, filters),
+          thumbnail: item.thumbnail_display_urls?.medium,
+        }));
+      })
+    );
+    item.items = items;
+  }
+
+  await redisClient.setEx(`/item/${id}`, 60 * 60 * 12, JSON.stringify(item));
+  return item;
 }
 
 // ---
@@ -293,9 +314,7 @@ server.get("/items", async (req, res) => {
   return localizeObject(await getItems(), req.query?.lang);
 });
 
-server.get("/item/:id(^[0-9]+$)", async (req, res) => {
-  // return localizeObject(await getItems(), req.query?.lang);
-  //  req;
+server.get("/items/:id(^[0-9]+$)", async (req, res) => {
   return localizeObject(await getItem(req.params.id), req.query?.lang);
 });
 

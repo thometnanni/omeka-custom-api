@@ -70,3 +70,7 @@ export function localizeObject(obj, lang) {
     Array.isArray(obj) ? [] : {}
   );
 }
+
+export function filterQuery(property, value, index = 0, type = "res") {
+  return `property[${index}][property]=${property}&property[${index}][type]=${type}&property[${index}][text]=${value}`;
+}
