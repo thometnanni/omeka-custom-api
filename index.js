@@ -243,13 +243,14 @@ async function getItems() {
 
 // ITEMS
 async function getItem(id) {
-  const cached = await redisClient.get(`/item/${id}`);
-  if (cached) return JSON.parse(cached);
+  // const cached = await redisClient.get(`/item/${id}`);
+  // if (cached) return JSON.parse(cached);
   const filters = await getFilters();
   const item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
     d.json().then((item) => {
       return {
         id: item["o:id"],
+        media: item["o:media"]?.map((media) => media["o:id"]),
         type: flattenType(item, types),
         title: flattenProperty(item["dcterms:title"]),
         titleAlt: flattenProperty(item["dcterms:alternative"]),
@@ -260,6 +261,23 @@ async function getItem(id) {
       };
     })
   );
+
+  if (item.media) {
+    item.media = (
+      await Promise.all(
+        item.media.map(
+          async (id) =>
+            await fetch(`${OMEKA_API}/media/${id}`).then((d) => d.json())
+        )
+      )
+    ).map((media) => ({
+      filename: media["o:source"],
+      url: media["o:original_url"],
+      type: media["o:media_type"],
+    }));
+  }
+
+  console.log(item.media);
 
   if (Object.keys(types).includes(item.type)) {
     const type = Object.entries(types).find(([key]) => key === item.type)[1];
