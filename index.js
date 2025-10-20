@@ -243,8 +243,8 @@ async function getItems() {
 
 // ITEMS
 async function getItem(id) {
-  // const cached = await redisClient.get(`/item/${id}`);
-  // if (cached) return JSON.parse(cached);
+  const cached = await redisClient.get(`/item/${id}`);
+  if (cached) return JSON.parse(cached);
   const filters = await getFilters();
   const item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
     d.json().then((item) => {
