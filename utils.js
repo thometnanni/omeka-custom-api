@@ -1,3 +1,24 @@
+export const types = {
+  creator: {
+    term: "foaf:Person",
+    property: "dcterms:creator",
+  },
+  objectType: {
+    term: "skos:Concept",
+    property: "curation:category",
+  },
+  theme: {
+    term: "dctype:Collection",
+    property: "curation:theme",
+  },
+  era: { term: "dctype:Event", property: "dcterms:coverage" },
+};
+
+export const filterConfig = {
+  ...types,
+  year: { property: "dcterms:date", searchType: "sw" },
+};
+
 export function parseOrigin(origin) {
   return origin
     .match(/(?:\/.*?\/|[^,])+/g)
@@ -22,7 +43,7 @@ export function flattenProperty(property) {
   return value?.trim?.() ?? value;
 }
 
-export function flattenLinkedProperties(item, types, filters) {
+export function flattenLinkedProperties(item, filters) {
   return Object.fromEntries(
     Object.entries(types).map(([name, type]) => {
       const values = item[type.property]?.map(({ value_resource_id }) => {
@@ -38,7 +59,7 @@ export function flattenLinkedProperties(item, types, filters) {
   );
 }
 
-export function flattenType(item, types) {
+export function flattenType(item) {
   const term = [item["@type"]]?.flat()?.find((type) =>
     Object.values(types)
       .map(({ term }) => term)
@@ -73,4 +94,64 @@ export function localizeObject(obj, lang) {
 
 export function filterQuery(property, value, index = 0, type = "res") {
   return `property[${index}][property]=${property}&property[${index}][type]=${type}&property[${index}][text]=${value}`;
+}
+
+export function parseQuery(query, offset = 0) {
+  const filters = {
+    objectType: (query?.objectType?.split(",") ?? []).sort(),
+    creator: (query?.creator?.split(",") ?? []).sort(),
+    theme: (query?.theme?.split(",") ?? []).sort(),
+    era: (query?.era?.split(",") ?? []).sort(),
+    year: (query?.year?.split(",") ?? []).sort(),
+  };
+
+  const queryStrings = Object.entries(filters)
+    .map(([type, values]) =>
+      values.map((value) => {
+        return {
+          property: filterConfig[type].property,
+          searchType: filterConfig[type].searchType,
+          value,
+        };
+      })
+    )
+    .flat()
+    .map(({ property, value, searchType }, i) =>
+      filterQuery(property, value, offset + i, searchType)
+    );
+
+  const search = query?.search?.trim();
+
+  if (search) {
+    queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
+  }
+  return queryStrings.join("&");
+}
+
+export function formatItem(item, filters) {
+  return {
+    id: item["o:id"],
+    type: flattenType(item),
+    title: flattenProperty(item["dcterms:title"]),
+    ...flattenLinkedProperties(item, filters),
+    thumbnail: item.thumbnail_display_urls?.medium,
+  };
+}
+
+export function formatMedia(media) {
+  return {
+    filename: media["o:source"],
+    url: media["o:original_url"],
+    type: media["o:media_type"],
+  };
+}
+
+export function formatItemDetailed(item, filters) {
+  return {
+    ...formatItem(item, filters),
+    media: item["o:media"]?.map((media) => media["o:id"]),
+    titleAlt: flattenProperty(item["dcterms:alternative"]),
+    description: flattenProperty(item["dcterms:description"]),
+    published: flattenProperty(item["dcterms:date"]),
+  };
 }
