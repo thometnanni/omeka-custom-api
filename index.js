@@ -17,6 +17,7 @@ import {
   formatItem,
   formatItemDetailed,
   formatMedia,
+  formatItemFilters,
 } from "./utils.js";
 
 // ---
@@ -30,6 +31,7 @@ const {
   ORIGIN,
   OMEKA_API,
   API_PORT = 3000,
+  PAGE_LIMIT = 100,
 } = process.env;
 
 // REDIS
@@ -55,11 +57,10 @@ async function getAllItems() {
   if (cached) return JSON.parse(cached);
   const allItems = [];
   let page = 1;
-  const perPage = 100;
 
   while (true) {
     const response = await fetch(
-      `${OMEKA_API}/items?page=${page}&per_page=${perPage}`
+      `${OMEKA_API}/items?page=${page}&per_page=${PAGE_LIMIT}`
     );
     const data = await response.json();
 
@@ -221,7 +222,7 @@ async function getItem(id = null, query) {
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
 
-  let item = null;
+  let item = {};
 
   if (id != null) {
     item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
@@ -229,21 +230,19 @@ async function getItem(id = null, query) {
     );
 
     if (item.media) {
-      item.media = (
-        await Promise.all(
-          item.media.map(
-            async (id) =>
-              await fetch(`${OMEKA_API}/media/${id}`).then((d) => d.json())
-          )
-        )
-      ).map(formatMedia);
+      const promises = item.media.map(
+        async (id) =>
+          await fetch(`${OMEKA_API}/media/${id}`).then((d) => d.json())
+      );
+      const media = await Promise.all(promises);
+      item.media = media.map(formatMedia);
     }
   }
 
-  const hasItems = id != null || Object.keys(types).includes(item.type);
+  const hasItems = id == null || Object.keys(types).includes(item.type);
 
   if (hasItems) {
-    let url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=100&${queryString}`;
+    let url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=${PAGE_LIMIT}&${queryString}`;
     if (id != null) {
       const type = Object.entries(types).find(([key]) => key === item.type)[1];
       url = `${url}&${filterQuery(type.property, item.id)}`;
@@ -253,6 +252,36 @@ async function getItem(id = null, query) {
         return items.map((item) => formatItem(item, filters));
       })
     );
+
+    if (queryString || id != null) {
+      if (item.items.length < PAGE_LIMIT) {
+        item.filters = formatItemFilters(item.items, filters);
+      } else {
+        const cached = await redisClient.get(`FILTERS:${url}`);
+        if (cached) {
+          item.filters = JSON.parse(cached);
+        } else {
+          let page = 2;
+          while (true) {
+            const batch = await fetch(`${url}&page=${page}`).then((d) =>
+              d.json().then((items) => {
+                return items.map((item) => formatItem(item, filters));
+              })
+            );
+            item.items.push(...batch);
+            page++;
+            if (batch.length < PAGE_LIMIT) break;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          item.filters = formatItemFilters(item.items, filters);
+          await redisClient.setEx(
+            `FILTERS:${url}`,
+            60 * 60 * 24 * 7,
+            JSON.stringify(item.filters)
+          );
+        }
+      }
+    }
   }
 
   await redisClient.setEx(

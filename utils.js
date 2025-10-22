@@ -135,6 +135,7 @@ export function formatItem(item, filters) {
     title: flattenProperty(item["dcterms:title"]),
     ...flattenLinkedProperties(item, filters),
     thumbnail: item.thumbnail_display_urls?.medium,
+    published: flattenProperty(item["dcterms:date"]),
   };
 }
 
@@ -152,6 +153,28 @@ export function formatItemDetailed(item, filters) {
     media: item["o:media"]?.map((media) => media["o:id"]),
     titleAlt: flattenProperty(item["dcterms:alternative"]),
     description: flattenProperty(item["dcterms:description"]),
-    published: flattenProperty(item["dcterms:date"]),
   };
+}
+
+export function formatItemFilters(items, filters) {
+  const itemFilters = Object.fromEntries(
+    Object.keys(filterConfig).map((key) => [key, {}])
+  );
+  items.forEach((item) => {
+    Object.keys(filterConfig).forEach((key) => {
+      if (!item[key]) return;
+      item[key].forEach((filter) => {
+        const filterKey = filter.id ?? filter.value;
+
+        itemFilters[key][filterKey] = itemFilters[key][filterKey]
+          ? itemFilters[key][filterKey] + 1
+          : 1;
+      });
+
+      itemFilters.year[item.published] = itemFilters.year[item.published]
+        ? itemFilters.year[item.published] + 1
+        : 1;
+    });
+  });
+  return itemFilters;
 }
