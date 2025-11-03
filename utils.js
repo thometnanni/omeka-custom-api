@@ -128,14 +128,31 @@ export function parseQuery(query, offset = 0) {
   return queryStrings.join("&");
 }
 
-export function formatItem(item, filters) {
+export function formatItem(raw, filters, search = null) {
+  const title = flattenProperty(raw["dcterms:title"]);
+  const description = flattenProperty(raw["dcterms:description"]);
+  const titleAlt = flattenProperty(raw["dcterms:alternative"]);
+  const published = flattenProperty(raw["dcterms:date"]);
+  const blob = [
+    textOf(title),
+    textOf(description),
+    textOf(titleAlt),
+    linkedTitles(raw, filters),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const hits = search ? extractSnippets(blob, search, 3, 80) : [];
+  const snippets = hits.length
+    ? Array.from(new Set(hits)).slice(0, 3)
+    : undefined;
   return {
-    id: item["o:id"],
-    type: flattenType(item),
-    title: flattenProperty(item["dcterms:title"]),
-    ...flattenLinkedProperties(item, filters),
-    thumbnail: item.thumbnail_display_urls?.medium,
-    published: flattenProperty(item["dcterms:date"]),
+    id: raw["o:id"],
+    type: flattenType(raw),
+    title,
+    ...flattenLinkedProperties(raw, filters),
+    thumbnail: raw.thumbnail_display_urls?.medium,
+    published,
+    ...(snippets ? { snippets } : {}),
   };
 }
 
@@ -147,12 +164,13 @@ export function formatMedia(media) {
   };
 }
 
-export function formatItemDetailed(item, filters) {
+export function formatItemDetailed(raw, filters, search = null) {
+  const base = formatItem(raw, filters, search);
   return {
-    ...formatItem(item, filters),
-    media: item["o:media"]?.map((media) => media["o:id"]),
-    titleAlt: flattenProperty(item["dcterms:alternative"]),
-    description: flattenProperty(item["dcterms:description"]),
+    ...base,
+    media: raw["o:media"]?.map((m) => m["o:id"]),
+    titleAlt: flattenProperty(raw["dcterms:alternative"]),
+    description: flattenProperty(raw["dcterms:description"]),
   };
 }
 
@@ -177,4 +195,50 @@ export function formatItemFilters(items, filters) {
     });
   });
   return itemFilters;
+}
+
+export function textOf(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map(textOf).filter(Boolean).join(" ");
+  if (typeof v === "object")
+    return Object.values(v).map(textOf).filter(Boolean).join(" ");
+  return String(v);
+}
+
+export function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function extractSnippets(text, query, maxSnippets = 3, context = 80) {
+  if (!text || !query) return [];
+  const terms = Array.from(
+    new Set(String(query).trim().split(/\s+/).filter(Boolean))
+  );
+  if (!terms.length) return [];
+  const re = new RegExp(terms.map(escapeRegex).join("|"), "gi");
+  const out = [];
+  let m;
+  while ((m = re.exec(text)) && out.length < maxSnippets) {
+    const a = Math.max(0, m.index - context);
+    const b = Math.min(text.length, m.index + m[0].length + context);
+    out.push(
+      (a > 0 ? "…" : "") + text.slice(a, b) + (b < text.length ? "…" : "")
+    );
+  }
+  return out;
+}
+
+export function linkedTitles(raw, filters) {
+  const out = [];
+  Object.entries(types).forEach(([name, type]) => {
+    const vals = raw[type.property] || [];
+    vals.forEach((v) => {
+      const id = v?.value_resource_id;
+      const m = filters[name]?.find((x) => x.id === id);
+      const t = m?.title || v?.display_title || v?.["o:label"];
+      if (t) out.push(String(t));
+    });
+  });
+  return out.join(" ");
 }

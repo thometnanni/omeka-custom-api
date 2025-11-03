@@ -221,26 +221,25 @@ async function getItem(id = null, query) {
   const cached = await redisClient.get(`/item/${id ?? ""}?${queryString}`);
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
-
+  const search =
+    typeof query?.search === "string" && query.search.trim()
+      ? query.search.trim()
+      : null;
   let item = {};
-
   if (id != null) {
     item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
-      d.json().then((item) => formatItemDetailed(item, filters))
+      d.json().then((r) => formatItemDetailed(r, filters, search))
     );
-
     if (item.media) {
       const promises = item.media.map(
-        async (id) =>
-          await fetch(`${OMEKA_API}/media/${id}`).then((d) => d.json())
+        async (mid) =>
+          await fetch(`${OMEKA_API}/media/${mid}`).then((d) => d.json())
       );
       const media = await Promise.all(promises);
       item.media = media.map(formatMedia);
     }
   }
-
   const hasItems = id == null || Object.keys(types).includes(item.type);
-
   if (hasItems) {
     let url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=${PAGE_LIMIT}&${queryString}`;
     if (id != null) {
@@ -248,11 +247,10 @@ async function getItem(id = null, query) {
       url = `${url}&${filterQuery(type.property, item.id)}`;
     }
     item.items = await fetch(url).then((d) =>
-      d.json().then((items) => {
-        return items.map((item) => formatItem(item, filters));
-      })
+      d
+        .json()
+        .then((items) => items.map((it) => formatItem(it, filters, search)))
     );
-
     if (queryString || id != null) {
       if (item.items.length < PAGE_LIMIT) {
         item.filters = formatItemFilters(item.items, filters);
@@ -264,9 +262,11 @@ async function getItem(id = null, query) {
           let page = 2;
           while (true) {
             const batch = await fetch(`${url}&page=${page}`).then((d) =>
-              d.json().then((items) => {
-                return items.map((item) => formatItem(item, filters));
-              })
+              d
+                .json()
+                .then((items) =>
+                  items.map((it) => formatItem(it, filters, search))
+                )
             );
             item.items.push(...batch);
             page++;
@@ -283,7 +283,6 @@ async function getItem(id = null, query) {
       }
     }
   }
-
   await redisClient.setEx(
     `/item/${id}?${queryString}`,
     60 * 60 * 12,
