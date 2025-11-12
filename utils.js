@@ -1,3 +1,5 @@
+import he from "he";
+
 export const types = {
   creator: {
     term: "foaf:Person",
@@ -157,10 +159,22 @@ export function formatItem(raw, filters, search = null) {
 }
 
 export function formatMedia(media) {
+  const rawHtml = media?.data?.html ?? media?.["o-cnt:chars"];
+  const html = rawHtml ? he.decode(rawHtml) : null;
+  const text = html ? htmlToPlainText(html) : null;
+  const rawLang =
+    media?.["o:lang"] ??
+    media?.["o:language"] ??
+    media?.["dcterms:language"]?.[0]?.["@value"];
+  const lang =
+    typeof rawLang === "string" && rawLang.length ? rawLang : null;
   return {
     filename: media["o:source"],
     url: media["o:original_url"],
     type: media["o:media_type"],
+    ...(lang ? { lang } : {}),
+    ...(html ? { html } : {}),
+    ...(text ? { text } : {}),
   };
 }
 
@@ -241,4 +255,13 @@ export function linkedTitles(raw, filters) {
     });
   });
   return out.join(" ");
+}
+
+function htmlToPlainText(html) {
+  return html
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
