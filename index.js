@@ -32,10 +32,7 @@ const {
   OMEKA_API,
   API_PORT = 3000,
   PAGE_LIMIT = 100,
-  CACHE_NAMESPACE = "v3",
 } = process.env;
-
-const withNamespace = (key) => `${CACHE_NAMESPACE}:${key}`;
 
 // REDIS
 const redisClient = createClient({
@@ -56,8 +53,7 @@ await server.register(cors, {
 // ---
 // ALL ITEMS
 async function getAllItems() {
-  const key = withNamespace("allItems");
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get("allItems");
   if (cached) return JSON.parse(cached);
   const allItems = [];
   let page = 1;
@@ -78,7 +74,7 @@ async function getAllItems() {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  await redisClient.setEx(key, 60 * 60, JSON.stringify(allItems));
+  await redisClient.setEx("allItems", 60 * 60, JSON.stringify(allItems));
   return allItems;
 }
 
@@ -131,8 +127,7 @@ async function getFilterByType(type) {
 
 // FILTERS
 async function getFilters(force = false) {
-  const key = withNamespace("/filters");
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get("/filters");
   if (cached && !force) return JSON.parse(cached);
   const filters = {
     year: await getFilterYears(),
@@ -141,14 +136,13 @@ async function getFilters(force = false) {
     theme: await getFilterByType("theme"),
     era: await getFilterByType("era"),
   };
-  await redisClient.setEx(key, 60 * 60 * 24, JSON.stringify(filters));
+  await redisClient.setEx("/filters", 60 * 60 * 24, JSON.stringify(filters));
   return filters;
 }
 
 // NEWSLETTERS
 async function getNewsletters() {
-  const key = withNamespace("/newsletters");
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get("/newsletters");
   if (cached) return JSON.parse(cached);
 
   const parser = new Parser({
@@ -172,14 +166,17 @@ async function getNewsletters() {
       image: item.enclosure?.url,
     })),
   };
-  await redisClient.setEx(key, 60 * 60 * 24, JSON.stringify(newsletters));
+  await redisClient.setEx(
+    "/newsletters",
+    60 * 60 * 24,
+    JSON.stringify(newsletters)
+  );
   return newsletters;
 }
 
 // FEATURED
 async function getFeatured() {
-  const key = withNamespace("/featured");
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get("/featured");
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
   const featured = await fetch(`${OMEKA_API}/items?item_set_id=4322`).then(
@@ -195,14 +192,13 @@ async function getFeatured() {
       })
   );
 
-  await redisClient.setEx(key, 60 * 60 * 24, JSON.stringify(featured));
+  await redisClient.setEx("/featured", 60 * 60 * 24, JSON.stringify(featured));
   return featured;
 }
 
 // SPASH IMAGE
 async function getSplashImages() {
-  const key = withNamespace("/splash-images");
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get("/splash-images");
   if (cached) return JSON.parse(cached);
   const splashImages = await fetch(`${OMEKA_API}/items?item_set_id=4329`).then(
     (d) =>
@@ -212,7 +208,7 @@ async function getSplashImages() {
   );
 
   await redisClient.setEx(
-    key,
+    "/splash-images",
     60 * 60 * 24 * 7,
     JSON.stringify(splashImages)
   );
@@ -222,8 +218,7 @@ async function getSplashImages() {
 // ITEMS
 async function getItem(id = null, query) {
   const queryString = parseQuery(query, 1);
-  const key = withNamespace(`/item/${id ?? ""}?${queryString}`);
-  const cached = await redisClient.get(key);
+  const cached = await redisClient.get(`/item/${id ?? ""}?${queryString}`);
   if (cached) return JSON.parse(cached);
   const filters = await getFilters();
   const search =
@@ -260,10 +255,9 @@ async function getItem(id = null, query) {
       if (item.items.length < PAGE_LIMIT) {
         item.filters = formatItemFilters(item.items, filters);
       } else {
-        const filtersKey = withNamespace(`FILTERS:${url}`);
-        const cachedFilters = await redisClient.get(filtersKey);
-        if (cachedFilters) {
-          item.filters = JSON.parse(cachedFilters);
+        const cached = await redisClient.get(`FILTERS:${url}`);
+        if (cached) {
+          item.filters = JSON.parse(cached);
         } else {
           let page = 2;
           while (true) {
@@ -281,7 +275,7 @@ async function getItem(id = null, query) {
           }
           item.filters = formatItemFilters(item.items, filters);
           await redisClient.setEx(
-            filtersKey,
+            `FILTERS:${url}`,
             60 * 60 * 24 * 7,
             JSON.stringify(item.filters)
           );
@@ -289,7 +283,11 @@ async function getItem(id = null, query) {
       }
     }
   }
-  await redisClient.setEx(key, 60 * 60 * 12, JSON.stringify(item));
+  await redisClient.setEx(
+    `/item/${id}?${queryString}`,
+    60 * 60 * 12,
+    JSON.stringify(item)
+  );
   return item;
 }
 
@@ -344,7 +342,7 @@ server.get("/omeka/*", async (req, res) => {
   const query = new URLSearchParams(req.query).toString();
   const url = `${OMEKA_API}/${path}?${query}`;
 
-  const cacheKey = withNamespace(makeCacheKey(req));
+  const cacheKey = makeCacheKey(req);
   const cached = await redisClient.get(cacheKey);
   if (cached) return JSON.parse(cached);
 
@@ -375,7 +373,7 @@ async function preload() {
 
 async function preloadFilters(force = false) {
   await getFilters(force);
-  const ttl = await redisClient.ttl(withNamespace("/filters"));
+  const ttl = await redisClient.ttl("/filters");
   setTimeout(preloadFilters, ttl * 0.95, true);
 }
 
