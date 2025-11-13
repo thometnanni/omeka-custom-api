@@ -300,33 +300,6 @@ server.get("/items/:id(^[0-9]+$)", async (req, res) => {
   return localizeObject(filterMediaByLang(item, lang), lang);
 });
 
-// PASS THROUGH
-server.get("/omeka/*", async (req, res) => {
-  const path = req.params["*"];
-  const query = new URLSearchParams(req.query).toString();
-  const url = `${OMEKA_API}/${path}?${query}`;
-
-  const cacheKey = makeCacheKey(req);
-  const cached = await getCache(cacheKey);
-  if (cached) return cached;
-
-  const options = {
-    method: req.method,
-    headers: { "Content-Type": "application/json" },
-  };
-
-  const response = await fetch(url, options).then((res) => res);
-
-  const data = await response.json();
-
-  await setCache(cacheKey, 60 * 60, data);
-
-  res
-    .code(response.status)
-    .header("Content-Type", "application/json; charset=utf-8")
-    .send(data);
-});
-
 // ---
 // PRELOAD
 // ---
