@@ -12,6 +12,7 @@ import {
   formatMedia,
   formatItemFilters,
 } from "./utils.js";
+import { OMEKA_API, PAGE_LIMIT } from "./env.js";
 import { getCache, setCache } from "./redis.js";
 
 export async function getAllItems() {
