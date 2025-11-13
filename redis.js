@@ -1,14 +1,11 @@
-import dotenv from "dotenv";
+import { REDIS_HOST, REDIS_PORT } from "./env.js";
 import { createClient } from "redis";
-
-dotenv.config();
-const { REDIS_HOST = "localhost", REDIS_PORT = 6379 } = process.env;
 
 // REDIS
 const redisClient = createClient({
   socket: {
-  host: REDIS_HOST,
-  port: REDIS_PORT,
+    host: REDIS_HOST,
+    port: REDIS_PORT,
   },
 });
 redisClient.on("error", (err) => console.error("Redis Client Error", err));

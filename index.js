@@ -1,4 +1,3 @@
-import dotenv from "dotenv";
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import Parser from "rss-parser";
@@ -20,13 +19,10 @@ import {
   filterMediaByLang,
 } from "./utils.js";
 import { flushCache, getCache, setCache, ttlCache } from "./redis.js";
-
+import { ORIGIN, OMEKA_API, API_PORT, PAGE_LIMIT } from "./env.js";
 // ---
 // SETUP
 // ---
-// ENV
-dotenv.config();
-const { ORIGIN, OMEKA_API, API_PORT = 3000, PAGE_LIMIT = 100 } = process.env;
 
 // FASTIFY+CORS
 const server = fastify({});
