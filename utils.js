@@ -166,8 +166,7 @@ export function formatMedia(media) {
     media?.["o:lang"] ??
     media?.["o:language"] ??
     media?.["dcterms:language"]?.[0]?.["@value"];
-  const lang =
-    typeof rawLang === "string" && rawLang.length ? rawLang : null;
+  const lang = typeof rawLang === "string" && rawLang.length ? rawLang : null;
   return {
     filename: media["o:source"],
     url: media["o:original_url"],
@@ -264,4 +263,21 @@ function htmlToPlainText(html) {
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function filterMediaByLang(item, lang) {
+  // console.log(item, lang);
+  if (!lang || !item?.media) return item;
+  console.log(item?.media);
+  const filtered = item.media.filter(({ lang: mediaLang }) => {
+    if (!mediaLang) return true;
+    return mediaLang === lang;
+  });
+  if (!filtered.length || filtered.length === item.media.length) {
+    return item;
+  }
+  return {
+    ...item,
+    media: filtered,
+  };
 }

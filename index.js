@@ -18,6 +18,7 @@ import {
   formatItemDetailed,
   formatMedia,
   formatItemFilters,
+  filterMediaByLang,
 } from "./utils.js";
 
 // ---
@@ -375,21 +376,6 @@ async function preloadFilters(force = false) {
   await getFilters(force);
   const ttl = await redisClient.ttl("/filters");
   setTimeout(preloadFilters, ttl * 0.95, true);
-}
-
-function filterMediaByLang(item, lang) {
-  if (!lang || !item?.media) return item;
-  const filtered = item.media.filter(({ lang: mediaLang }) => {
-    if (!mediaLang) return true;
-    return mediaLang === lang;
-  });
-  if (!filtered.length || filtered.length === item.media.length) {
-    return item;
-  }
-  return {
-    ...item,
-    media: filtered,
-  };
 }
 
 // ---
