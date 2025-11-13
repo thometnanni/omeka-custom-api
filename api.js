@@ -15,9 +15,18 @@ import {
 import { OMEKA_API, PAGE_LIMIT } from "./env.js";
 import { getCache, setCache } from "./redis.js";
 
+let awaitingAllItems = false;
+
 export async function getAllItems() {
   const cached = await getCache("allItems");
   if (cached) return cached;
+  if (awaitingAllItems) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return await getAllItems();
+  }
+  awaitingAllItems = true;
+  const timeout = setTimeout(() => (awaitingAllItems = false), 1000 * 30);
+
   const allItems = [];
   let page = 1;
 
@@ -37,6 +46,8 @@ export async function getAllItems() {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  awaitingAllItems = false;
+  clearTimeout(timeout);
   return await setCache("allItems", 60 * 60, allItems);
 }
 
