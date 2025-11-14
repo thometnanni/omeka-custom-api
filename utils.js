@@ -323,6 +323,7 @@ export function parseOmekaFields(item, filters) {
     description: normalizeValue(item["dcterms:description"]),
     titleAlt: normalizeValue(item["dcterms:alternative"]),
     published: normalizeValue(item["dcterms:date"]),
+    text: normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
     type: flattenType(item),
     thumbnail: item.thumbnail_display_urls?.medium,
