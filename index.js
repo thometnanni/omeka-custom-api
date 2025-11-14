@@ -9,6 +9,8 @@ import {
   getFeatured,
   getSplashImages,
   getItem,
+  getItemDetails,
+  queryItems,
 } from "./api.js";
 // ---
 // SETUP
@@ -47,22 +49,26 @@ server.get("/splash-images", async (req, res) => {
   return await getSplashImages();
 });
 
-server.get("/items", async (req, res) => {
-  const lang =
-    typeof req.query?.lang === "string" && req.query.lang !== ""
-      ? req.query.lang
-      : null;
-  const item = await getItem(null, req.query);
-  return localizeObject(filterMediaByLang(item, lang), lang);
+server.get("/item/:id(^[0-9]+$)", async (req, reply) => {
+  const lang = req.query?.lang || null;
+  const res = await getItem(req.params.id);
+  if (res.error) return reply.send(res.error);
+  return localizeObject(filterMediaByLang(res, lang), lang);
 });
 
-server.get("/items/:id(^[0-9]+$)", async (req, res) => {
-  const lang =
-    typeof req.query?.lang === "string" && req.query.lang !== ""
-      ? req.query.lang
-      : null;
-  const item = await getItem(req.params.id, req.query);
-  return localizeObject(filterMediaByLang(item, lang), lang);
+server.get("/item-details/:id(^[0-9]+$)", async (req, reply) => {
+  const lang = req.query?.lang || null;
+  const res = await getItemDetails(req.params.id);
+  if (res.error) return reply.send(res.error);
+  return localizeObject(filterMediaByLang(res, lang), lang);
+});
+
+server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
+  const lang = req.query?.lang || null;
+  const res = await queryItems(req.params.id, req.query);
+
+  if (res.error) return reply.send(res.error);
+  return localizeObject(filterMediaByLang(res, lang), lang);
 });
 
 // ---

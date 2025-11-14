@@ -55,21 +55,39 @@ export function makeCacheKey(req) {
 }
 
 /**
- * Normalize a property value from the API into a string, a language-indexed object,
- * or leave it as-is for non-standard shapes.
+ * Normalize a value from the API into a language-indexed object or single value
  * - If property is an array with length > 1: returns { langCode: value, ... }
- * - Otherwise returns the first "@value" or the value itself, trimmed where possible.
+ * - Otherwise returns the first "@value" or the value itself
  * @param {*} property
  * @returns {string|Object|*}
  */
-export function flattenProperty(property) {
+export function normalizeValue(property) {
   if (Array.isArray(property) && property.length > 1) {
     return Object.fromEntries(
-      property.map((p) => [p["@language"], p["@value"].trim?.()] ?? p["@value"])
+      property.map(({ "@language": language, "@value": value }) => [
+        language,
+        safeTrim(value),
+      ])
     );
   }
-  const value = property?.[0]?.["@value"] ?? property?.["@value"] ?? property;
-  return value?.trim?.() ?? value;
+
+  if (Array.isArray(property)) property = property[0];
+
+  return safeTrim(property?.["@value"] ?? property);
+}
+
+/**
+ * Returns a trimmed string if the input is a string,
+ * otherwise returns the original value unchanged.
+ *
+ * @param {*} value – any value you want to trim
+ * @returns {*} – trimmed string or the original value
+ */
+function safeTrim(value) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  return value;
 }
 
 /**
@@ -79,17 +97,19 @@ export function flattenProperty(property) {
  * @param {Object} filters - lookup of available filters keyed by type name
  * @returns {Object.<string, Array<{title?:string,id?:*}>>}
  */
-export function flattenLinkedProperties(item, filters) {
+export function resolveLinkedProperties(item, filters) {
   return Object.fromEntries(
     Object.entries(types).map(([name, type]) => {
-      const values = item[type.property]?.map(({ value_resource_id }) => {
-        const { title, id } =
-          filters[name]?.find(({ id }) => id === value_resource_id) ?? {};
-        return {
-          title,
-          id,
-        };
-      });
+      const values = item[type.property]?.map(
+        ({ value_resource_id: value }) => {
+          const { title, id } =
+            filters[name]?.find(({ id }) => id === value) ?? {};
+          return {
+            title,
+            id,
+          };
+        }
+      );
       return [name, values];
     })
   );
@@ -191,6 +211,7 @@ export function parseQuery(query, offset = 0) {
   if (search) {
     queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
   }
+
   return queryStrings.join("&");
 }
 
@@ -204,10 +225,10 @@ export function parseQuery(query, offset = 0) {
  * @returns {Object}
  */
 export function formatItem(raw, filters, search = null) {
-  const title = flattenProperty(raw["dcterms:title"]);
-  const description = flattenProperty(raw["dcterms:description"]);
-  const titleAlt = flattenProperty(raw["dcterms:alternative"]);
-  const published = flattenProperty(raw["dcterms:date"]);
+  const title = normalizeValue(raw["dcterms:title"]);
+  const description = normalizeValue(raw["dcterms:description"]);
+  const titleAlt = normalizeValue(raw["dcterms:alternative"]);
+  const published = normalizeValue(raw["dcterms:date"]);
   const blob = [
     textOf(title),
     textOf(description),
@@ -224,7 +245,7 @@ export function formatItem(raw, filters, search = null) {
     id: raw["o:id"],
     type: flattenType(raw),
     title,
-    ...flattenLinkedProperties(raw, filters),
+    ...resolveLinkedProperties(raw, filters),
     thumbnail: raw.thumbnail_display_urls?.medium,
     published,
     ...(snippets ? { snippets } : {}),
@@ -232,30 +253,46 @@ export function formatItem(raw, filters, search = null) {
 }
 
 /**
- * Normalize a media object:
- * - decode html if present, generate plain text version,
- * - detect language from several possible fields,
- * - return only present properties.
- * @param {Object} media
+ * Normalize a media items array:
+ * - remove html media
+ * - return normalized media array
+ * @param {Object} items
  * @returns {Object}
  */
-export function formatMedia(media) {
-  const rawHtml = media?.data?.html ?? media?.["o-cnt:chars"];
-  const html = rawHtml ? he.decode(rawHtml) : null;
-  const text = html ? htmlToPlainText(html) : null;
-  const rawLang =
-    media?.["o:lang"] ??
-    media?.["o:language"] ??
-    media?.["dcterms:language"]?.[0]?.["@value"];
-  const lang = typeof rawLang === "string" && rawLang.length ? rawLang : null;
-  return {
-    filename: media["o:source"],
-    url: media["o:original_url"],
-    type: media["o:media_type"],
-    ...(lang ? { lang } : {}),
-    ...(html ? { html } : {}),
-    ...(text ? { text } : {}),
-  };
+export function normalizeMedia(items) {
+  const mediaItems = items
+    .filter(({ "o:renderer": renderer }) => renderer !== "html")
+    .map(
+      ({
+        "o:source": filename,
+        "o:original_url": url,
+        "o:media_type": type,
+      }) => ({ filename, url, type })
+    );
+
+  if (mediaItems.length === 0) return null;
+  return mediaItems;
+}
+
+/**
+ * Normalize a html media items array:
+ * - remove non html media
+ * - parse language and decode html
+ * - normalize return value
+ * @param {Object} items
+ * @returns {Object}
+ */
+export function normalizeHtml(items) {
+  const htmlItems = items
+    .filter(({ "o:renderer": renderer }) => renderer === "html")
+    .map(({ data, "o:lang": lang }) => {
+      const html = he.decode(data.html);
+      return { "@language": lang, "@value": html };
+    });
+
+  if (htmlItems.length === 0) return null;
+
+  return normalizeValue(htmlItems);
 }
 
 /**
@@ -271,24 +308,53 @@ export function formatItemDetailed(raw, filters, search = null) {
   return {
     ...base,
     media: raw["o:media"]?.map((m) => m["o:id"]),
-    titleAlt: flattenProperty(raw["dcterms:alternative"]),
-    description: flattenProperty(raw["dcterms:description"]),
+    titleAlt: normalizeValue(raw["dcterms:alternative"]),
+    description: normalizeValue(raw["dcterms:description"]),
   };
+}
+
+export function parseOmekaFields(item, filters) {
+  return omitNullish({
+    id: item["o:id"],
+    title: normalizeValue(item["dcterms:title"]),
+    description: normalizeValue(item["dcterms:description"]),
+    titleAlt: normalizeValue(item["dcterms:alternative"]),
+    published: normalizeValue(item["dcterms:date"]),
+    media: item["o:media"]?.map((m) => m["o:id"]),
+    type: flattenType(item),
+    thumbnail: item.thumbnail_display_urls?.medium,
+    ...resolveLinkedProperties(item, filters),
+  });
+}
+
+/**
+ * Return a new object that contains only the entries whose value is
+ * neither null nor undefined.
+ *
+ * @param {Object} obj – the source object
+ * @returns {Object} a copy without null/undefined values
+ */
+function omitNullish(obj) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(
+      ([, value]) => value !== null && value !== undefined
+    )
+  );
 }
 
 /**
  * Generate counts for UI filters from a list of formatted items.
  * Returns an object keyed by filter name containing counts per filter value.
  * @param {Array} items - formatted items
- * @param {Object} filters - (not used for computation, only keys are needed)
  * @returns {Object.<string, Object.<string, number>>}
  */
-export function formatItemFilters(items, filters) {
+export function formatItemFilters(items) {
   const itemFilters = Object.fromEntries(
     Object.keys(filterConfig).map((key) => [key, {}])
   );
+
   items.forEach((item) => {
-    Object.keys(filterConfig).forEach((key) => {
+    Object.keys(types).forEach((key) => {
       if (!item[key]) return;
       item[key].forEach((filter) => {
         const filterKey = filter.id ?? filter.value;
@@ -297,11 +363,11 @@ export function formatItemFilters(items, filters) {
           ? itemFilters[key][filterKey] + 1
           : 1;
       });
-
-      itemFilters.year[item.published] = itemFilters.year[item.published]
-        ? itemFilters.year[item.published] + 1
-        : 1;
     });
+
+    itemFilters.year[item.published] = itemFilters.year[item.published]
+      ? itemFilters.year[item.published] + 1
+      : 1;
   });
   return itemFilters;
 }

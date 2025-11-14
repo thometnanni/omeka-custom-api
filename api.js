@@ -1,16 +1,15 @@
 import Parser from "rss-parser";
 import he from "he";
 import {
-  flattenProperty,
-  flattenLinkedProperties,
+  normalizeValue,
+  resolveLinkedProperties,
   flattenType,
-  filterQuery,
   types,
   parseQuery,
-  formatItem,
-  formatItemDetailed,
-  formatMedia,
+  normalizeMedia,
+  normalizeHtml,
   formatItemFilters,
+  parseOmekaFields,
 } from "./utils.js";
 import { OMEKA_API, PAGE_LIMIT } from "./env.js";
 import { getCache, setCache } from "./redis.js";
@@ -81,7 +80,7 @@ export async function getFilterByType(type) {
   const items = allItems
     .filter((item) => item["@type"].includes(term))
     .map((item) => {
-      const title = flattenProperty(item["dcterms:title"]);
+      const title = normalizeValue(item["dcterms:title"]);
       const id = item["o:id"];
       const count = allItems.filter((item) =>
         item[property]?.find((creator) => creator.value_resource_id === id)
@@ -152,8 +151,8 @@ export async function getFeatured() {
         return items.map((item) => ({
           id: item["o:id"],
           type: flattenType(item),
-          title: flattenProperty(item["dcterms:title"]),
-          ...flattenLinkedProperties(item, filters),
+          title: normalizeValue(item["dcterms:title"]),
+          ...resolveLinkedProperties(item, filters),
           thumbnail: item.thumbnail_display_urls?.medium,
         }));
       })
@@ -177,72 +176,64 @@ export async function getSplashImages() {
 }
 
 // ITEMS
-export async function getItem(id = null, query) {
-  const queryString = parseQuery(query, 1);
-  const cached = await getCache(`/item/${id ?? ""}?${queryString}`);
+export async function getItem(id) {
+  const cached = await getCache(`item:${id}`);
   if (cached) return cached;
+
   const filters = await getFilters();
-  const search =
-    typeof query?.search === "string" && query.search.trim()
-      ? query.search.trim()
-      : null;
-  let item = {};
+  const res = await fetch(`${OMEKA_API}/items/${id}`);
+
+  if (!res.ok) return { error: res };
+
+  const json = await res.json();
+  const item = parseOmekaFields(json, filters);
+
+  return await setCache(`item:${id}`, 60 * 60 * 12, item);
+}
+
+export async function getItemDetails(id) {
+  const cached = await getCache(`item:details:${id}`);
+  if (cached) return cached;
+  const item = await getItem(id);
+
+  if (item.media == null || item.media.length === 1) return [];
+
+  const res = await fetch(`${OMEKA_API}/media?id=${item.media.join(",")}`);
+
+  if (!res.ok) return { error: res };
+
+  const mediaItems = await res.json();
+
+  const media = normalizeMedia(mediaItems);
+  const html = normalizeHtml(mediaItems);
+
+  return await setCache(`item:details:${id}`, 60 * 60 * 12, { media, html });
+}
+
+export async function queryItems(id, query = {}) {
   if (id != null) {
-    item = await fetch(`${OMEKA_API}/items/${id}`).then((d) =>
-      d.json().then((r) => formatItemDetailed(r, filters, search))
-    );
-    if (item.media) {
-      const promises = item.media.map(
-        async (mid) =>
-          await fetch(`${OMEKA_API}/media/${mid}`).then((d) => d.json())
-      );
-      const media = await Promise.all(promises);
-      item.media = media.map(formatMedia);
-    }
+    const item = await getItem(id);
+    if (!Object.keys(types).includes(item.type)) return {};
+    query[item.type] = query[item.type] ? `${query[item.type]},${id}` : id;
   }
-  const hasItems = id == null || Object.keys(types).includes(item.type);
-  if (hasItems) {
-    let url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=${PAGE_LIMIT}&${queryString}`;
-    if (id != null) {
-      const type = Object.entries(types).find(([key]) => key === item.type)[1];
-      url = `${url}&${filterQuery(type.property, item.id)}`;
-    }
-    item.items = await fetch(url).then((d) =>
-      d
-        .json()
-        .then((items) => items.map((it) => formatItem(it, filters, search)))
-    );
-    if (queryString || id != null) {
-      if (item.items.length < PAGE_LIMIT) {
-        item.filters = formatItemFilters(item.items, filters);
-      } else {
-        const cached = await getCache(`FILTERS:${url}`);
-        if (cached) {
-          item.filters = cached;
-        } else {
-          let page = 2;
-          while (true) {
-            const batch = await fetch(`${url}&page=${page}`).then((d) =>
-              d
-                .json()
-                .then((items) =>
-                  items.map((it) => formatItem(it, filters, search))
-                )
-            );
-            item.items.push(...batch);
-            page++;
-            if (batch.length < PAGE_LIMIT) break;
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-          const formattedItemFilters = formatItemFilters(item.items, filters);
-          item.filters = await setCache(
-            `FILTERS:${url}`,
-            60 * 60 * 24 * 7,
-            formattedItemFilters
-          );
-        }
-      }
-    }
-  }
-  return await setCache(`/item/${id}?${queryString}`, 60 * 60 * 12, item);
+
+  const queryString = parseQuery(query);
+  const cached = await getCache(`query:${queryString}`);
+  if (cached) return cached;
+
+  const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=${PAGE_LIMIT}&${queryString}`;
+  const res = await fetch(url);
+
+  if (!res.ok) return { error: res };
+  const filters = await getFilters();
+
+  const json = await res.json();
+  const items = json.map((item) => parseOmekaFields(item, filters));
+
+  const queryFilters = queryString ? formatItemFilters(items) : filters;
+
+  return await setCache(`/item/${id}?${queryString}`, 60 * 60 * 12, {
+    items,
+    filters: queryFilters,
+  });
 }
