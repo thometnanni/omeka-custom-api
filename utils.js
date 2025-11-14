@@ -212,6 +212,9 @@ export function parseQuery(query, offset = 0) {
     queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
   }
 
+  const page = query?.page?.trim() ?? 1;
+  queryStrings.push(`page=${encodeURIComponent(page)}`);
+
   return queryStrings.join("&");
 }
 
