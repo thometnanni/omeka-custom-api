@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
-import { parseOrigin, localizeObject, filterMediaByLang } from "./utils.js";
+import { parseOrigin, localizeObject } from "./utils.js";
 import { flushCache, ttlCache } from "./redis.js";
 import { ORIGIN, API_PORT } from "./env.js";
 import {
@@ -53,14 +53,14 @@ server.get("/item/:id(^[0-9]+$)", async (req, reply) => {
   const lang = req.query?.lang || null;
   const res = await getItem(req.params.id);
   if (res.error) return reply.send(res.error);
-  return localizeObject(filterMediaByLang(res, lang), lang);
+  return localizeObject(res, lang);
 });
 
 server.get("/item-details/:id(^[0-9]+$)", async (req, reply) => {
   const lang = req.query?.lang || null;
   const res = await getItemDetails(req.params.id);
   if (res.error) return reply.send(res.error);
-  return localizeObject(filterMediaByLang(res, lang), lang);
+  return localizeObject(res, lang);
 });
 
 server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
@@ -68,7 +68,7 @@ server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
   const res = await queryItems(req.params.id, req.query);
 
   if (res.error) return reply.send(res.error);
-  return localizeObject(filterMediaByLang(res, lang), lang);
+  return localizeObject(res, lang);
 });
 
 // ---
