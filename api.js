@@ -10,6 +10,7 @@ import {
   normalizeHtml,
   formatItemFilters,
   parseOmekaFields,
+  extractSnippets,
 } from "./utils.js";
 import { OMEKA_API, PAGE_LIMIT } from "./env.js";
 import { getCache, setCache } from "./redis.js";
@@ -219,7 +220,7 @@ export async function queryItems(id, query = {}) {
 
   const queryString = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
-  if (cached) return cached;
+  // if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&per_page=${PAGE_LIMIT}&${queryString}`;
   const res = await fetch(url);
@@ -228,7 +229,15 @@ export async function queryItems(id, query = {}) {
   const filters = await getFilters();
 
   const json = await res.json();
-  const items = json.map((item) => parseOmekaFields(item, filters));
+  const items = json.map((item) => {
+    item = parseOmekaFields(item, filters, { text: true });
+    if (query.search) {
+      item.snippets = extractSnippets(item, query.search);
+    }
+    delete item.text;
+
+    return item;
+  });
 
   const queryFilters = queryString ? formatItemFilters(items) : filters;
 

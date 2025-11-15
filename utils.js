@@ -316,16 +316,16 @@ export function formatItemDetailed(raw, filters, search = null) {
   };
 }
 
-export function parseOmekaFields(item, filters) {
+export function parseOmekaFields(item, filters, include = { text: false }) {
   return omitNullish({
     id: item["o:id"],
     title: normalizeValue(item["dcterms:title"]),
     description: normalizeValue(item["dcterms:description"]),
+    type: flattenType(item),
     titleAlt: normalizeValue(item["dcterms:alternative"]),
     published: normalizeValue(item["dcterms:date"]),
-    text: normalizeValue(item["extracttext:extracted_text"]),
+    text: include.text && normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
-    type: flattenType(item),
     thumbnail: item.thumbnail_display_urls?.medium,
     ...resolveLinkedProperties(item, filters),
   });
@@ -405,32 +405,21 @@ export function escapeRegex(s) {
 }
 
 /**
- * Extract text snippets around matches of the query terms in the text.
- * Returns up to maxSnippets. Each snippet includes `context` characters around the match
- * and is trimmed with ellipses if truncated.
- * @param {string} text
- * @param {string} query - space-separated terms
- * @param {number} [maxSnippets=3]
- * @param {number} [context=80]
- * @returns {string[]}
+ * Extract text snippets around matches of the search terms in the text.
+ *
+ * @param {string} item
+ * @param {string} search - search term
+ * @returns {{term:string, snippet:string}[]}
  */
-export function extractSnippets(text, query, maxSnippets = 3, context = 80) {
-  if (!text || !query) return [];
-  const terms = Array.from(
-    new Set(String(query).trim().split(/\s+/).filter(Boolean))
-  );
-  if (!terms.length) return [];
-  const re = new RegExp(terms.map(escapeRegex).join("|"), "gi");
-  const out = [];
-  let m;
-  while ((m = re.exec(text)) && out.length < maxSnippets) {
-    const a = Math.max(0, m.index - context);
-    const b = Math.min(text.length, m.index + m[0].length + context);
-    out.push(
-      (a > 0 ? "…" : "") + text.slice(a, b) + (b < text.length ? "…" : "")
-    );
-  }
-  return out;
+export function extractSnippets(item, search) {
+  const regex = searchToRegex(search);
+
+  const snippets = [
+    ...matchWithContext(item.description, regex),
+    ...matchWithContext(item.text, regex),
+  ];
+
+  return snippets.slice(0, 3);
 }
 
 /**
@@ -452,4 +441,56 @@ export function linkedTitles(raw, filters) {
     });
   });
   return out.join(" ");
+}
+
+/**
+ * Converts a search string into a regular expression
+ *
+ * @param {string} str – The search term
+ * @returns {RegExp}   – The converted regex
+ */
+function searchToRegex(str) {
+  // Match either a quoted part ("…") or a run of non‑space chars.
+  const tokenRegex = /"([^"]*)"|(\S+)/g;
+
+  const matches = str.match(tokenRegex);
+  const terms = matches.map((match) =>
+    match
+      // remove quotation marks
+      .replace(/"/g, "")
+      // escape regex characters
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+
+  const regex = new RegExp(terms.join("|"), "gi");
+  return regex;
+}
+
+/**
+ * matches text against regex and returns results with context
+ *
+ * @param {string} text – The search term to split
+ * @param {string} regex – The regex to match against
+ * @param {number} [context=60] – Number of characters to include before and after each match. Defualts to 60.
+ *
+ * @returns {{term:string, snippet:string}[]} – An array of objects where:
+ *   • **term** – the exact substring that matched the regex.
+ *   • **snippet** – a trimmed excerpt of the original text including match with context
+ */
+function matchWithContext(text, regex, context = 60) {
+  const result = [];
+  let match;
+  while ((match = regex.exec(text)) != null) {
+    const term = match[0];
+
+    const start = Math.max(0, match.index - context);
+    const stop = Math.min(text.length, match.index + term.length + context);
+    const sliced = text.slice(start, stop).trim();
+
+    const snippet = `${start > 0 ? "…" : ""}${sliced}${
+      stop < text.length ? "…" : ""
+    }`;
+    result.push({ term, snippet });
+  }
+  return result;
 }
