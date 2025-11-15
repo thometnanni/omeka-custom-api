@@ -88,11 +88,16 @@ export function normalizeHtml(items) {
   return normalizeValue(htmlItems);
 }
 
-export function normalizeOmekaFields(item, filters, include = { text: false }) {
+export function normalizeOmekaFields(
+  item,
+  filters,
+  include = { text: false, description: false }
+) {
   return omitNullish({
     id: item["o:id"],
     title: normalizeValue(item["dcterms:title"]),
-    description: normalizeValue(item["dcterms:description"]),
+    description:
+      include.description && normalizeValue(item["dcterms:description"]),
     type: normalizeType(item),
     titleAlt: normalizeValue(item["dcterms:alternative"]),
     published: normalizeValue(item["dcterms:date"]),
