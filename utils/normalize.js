@@ -107,6 +107,10 @@ export function normalizeOmekaFields(
     ...resolveLinkedProperties(item, filters),
   });
 }
+
+export function normalizeHero(item) {
+  return item.thumbnail_display_urls?.large;
+}
 /**
  * Generate counts for UI filters from a list of formatted items.
  * Returns an object keyed by filter name containing counts per filter value.

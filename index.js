@@ -2,15 +2,14 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
 import { flushCache, ttlCache } from "./redis.js";
-import { ORIGIN, API_PORT } from "./env.js";
+import { ORIGIN, API_PORT, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
-  getNewsletters,
   getFeatured,
-  getSplashImages,
   getItem,
   getItemDetails,
   queryItems,
+  getHeroes,
 } from "./api.js";
 // ---
 // SETUP
@@ -37,38 +36,44 @@ server.get("/filters", async (req, res) => {
   return localizeObject(await getFilters(), req.query?.lang);
 });
 
-server.get("/newsletters", async (req, res) => {
-  return localizeObject(await getNewsletters(), req.query?.lang);
-});
+server.get("/featured", async (req) => {
+  const featured = await getFeatured();
+  if (featured.error) return reply.send(featured.error);
 
-server.get("/featured", async (req, res) => {
-  return localizeObject(await getFeatured(), req.query?.lang);
-});
+  const newItems = await queryItems(null, { limit: 10 });
+  if (newItems.error) return reply.send(newItems.error);
 
-server.get("/splash-images", async (req, res) => {
-  return await getSplashImages();
+  const newsletters = await queryItems(null, {
+    limit: 10,
+    objectType: NEWSLETTER_TYPE_ID,
+  });
+  if (newsletters.error) return reply.send(newsletters.error);
+
+  const heroes = await getHeroes();
+  if (heroes.error) return reply.send(heroes.error);
+
+  return localizeObject(
+    { featured, newItems, newsletters, heroes },
+    req.query.lang
+  );
 });
 
 server.get("/item/:id(^[0-9]+$)", async (req, reply) => {
-  const lang = req.query?.lang || null;
   const res = await getItem(req.params.id);
   if (res.error) return reply.send(res.error);
-  return localizeObject(res, lang);
+  return localizeObject(res, req.query.lang);
 });
 
 server.get("/item-details/:id(^[0-9]+$)", async (req, reply) => {
-  const lang = req.query?.lang || null;
   const res = await getItemDetails(req.params.id);
   if (res.error) return reply.send(res.error);
-  return localizeObject(res, lang);
+  return localizeObject(res, req.query.lang);
 });
 
 server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
-  const lang = req.query?.lang || null;
   const res = await queryItems(req.params.id, req.query);
-
   if (res.error) return reply.send(res.error);
-  return localizeObject(res, lang);
+  return localizeObject(res, req.query.lang);
 });
 
 // ---

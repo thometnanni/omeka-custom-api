@@ -1,18 +1,20 @@
-import Parser from "rss-parser";
-import he from "he";
 import { types } from "./types.js";
 import {
   normalizeValue,
-  resolveLinkedProperties,
-  normalizeType,
   normalizeMedia,
   normalizeHtml,
   normalizeItemFilters,
   normalizeOmekaFields,
+  normalizeHero,
 } from "./utils/normalize.js";
 import { parseQuery } from "./utils/query.js";
 import { extractSnippets } from "./utils/snippets.js";
-import { OMEKA_API, PAGE_LIMIT } from "./env.js";
+import {
+  FEATURED_ITEM_SET,
+  HEROES_ITEM_SET,
+  OMEKA_API,
+  PAGE_LIMIT,
+} from "./env.js";
 import { getCache, setCache } from "./redis.js";
 
 let awaitingAllItems = false;
@@ -112,68 +114,36 @@ export async function getFilters(force = false) {
   return await setCache("/filters", 60 * 60 * 24, filters);
 }
 
-// NEWSLETTERS
-export async function getNewsletters() {
-  const cached = await getCache("/newsletters");
-  if (cached) return cached;
-
-  const parser = new Parser({
-    customFields: {
-      item: ["description"],
-    },
-  });
-  const feed = await parser.parseURL(
-    "https://chinaunofficialarchives.substack.com/feed"
-  );
-
-  const newsletters = {
-    url: feed.link,
-    items: feed.items.map((item) => ({
-      title: {
-        zh: he.decode(item.title),
-        en: he.decode(item.description),
-      },
-      date: item.isoDate,
-      url: item.link,
-      image: item.enclosure?.url,
-    })),
-  };
-  return await setCache("/newsletters", 60 * 60 * 24, newsletters);
-}
-
 // FEATURED
 export async function getFeatured() {
-  const cached = await getCache("/featured");
+  const cached = await getCache("featured");
   if (cached) return cached;
-  const filters = await getFilters();
-  const featured = await fetch(`${OMEKA_API}/items?item_set_id=4322`).then(
-    (d) =>
-      d.json().then((items) => {
-        return items.map((item) => ({
-          id: item["o:id"],
-          type: normalizeType(item),
-          title: normalizeValue(item["dcterms:title"]),
-          ...resolveLinkedProperties(item, filters),
-          thumbnail: item.thumbnail_display_urls?.medium,
-        }));
-      })
-  );
 
-  return await setCache("/featured", 60 * 60 * 24, featured);
+  const url = `${OMEKA_API}/items?item_set_id=${FEATURED_ITEM_SET}`;
+  const res = await fetch(url);
+
+  if (!res.ok) return { error: res };
+  const filters = await getFilters();
+
+  const json = await res.json();
+  const featured = json.map((item) => normalizeOmekaFields(item, filters));
+
+  return await setCache("featured", 60 * 60 * 24, featured);
 }
 
-// SPASH IMAGE
-export async function getSplashImages() {
-  const cached = await getCache("/splash-images");
+export async function getHeroes() {
+  const cached = await getCache("heroes");
   if (cached) return cached;
-  const splashImages = await fetch(`${OMEKA_API}/items?item_set_id=4329`).then(
-    (d) =>
-      d.json().then((items) => {
-        return items.map((item) => item.thumbnail_display_urls?.large);
-      })
-  );
 
-  return await setCache("/splash-images", 60 * 60 * 24 * 7, splashImages);
+  const url = `${OMEKA_API}/items?item_set_id=${HEROES_ITEM_SET}`;
+  const res = await fetch(url);
+
+  if (!res.ok) return { error: res };
+
+  const json = await res.json();
+  const heroes = json.map((item) => normalizeHero(item));
+
+  return await setCache("heroes", 60 * 60 * 24 * 7, heroes);
 }
 
 // ITEMS
@@ -187,7 +157,7 @@ export async function getItem(id) {
   if (!res.ok) return { error: res };
 
   const json = await res.json();
-  const item = normalizeOmekaFields(json, filters);
+  const item = normalizeOmekaFields(json, filters, { description: true });
 
   return await setCache(`item:${id}`, 60 * 60 * 12, item);
 }
@@ -230,11 +200,15 @@ export async function queryItems(id, query = {}) {
 
   const json = await res.json();
   const items = json.map((item) => {
-    item = normalizeOmekaFields(item, filters, { text: true });
+    item = normalizeOmekaFields(item, filters, {
+      text: true,
+      description: true,
+    });
     if (query.search) {
       item.snippets = extractSnippets(item, query.search);
     }
     delete item.text;
+    delete item.description;
 
     return item;
   });
