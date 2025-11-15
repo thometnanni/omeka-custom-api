@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
-import { parseOrigin, localizeObject } from "./utils.js";
+import { parseOrigin, localizeObject } from "./utils/helper.js";
 import { flushCache, ttlCache } from "./redis.js";
 import { ORIGIN, API_PORT } from "./env.js";
 import {

@@ -1,17 +1,17 @@
 import Parser from "rss-parser";
 import he from "he";
+import { types } from "./types.js";
 import {
   normalizeValue,
   resolveLinkedProperties,
-  flattenType,
-  types,
-  parseQuery,
+  normalizeType,
   normalizeMedia,
   normalizeHtml,
-  formatItemFilters,
-  parseOmekaFields,
-  extractSnippets,
-} from "./utils.js";
+  normalizeItemFilters,
+  normalizeOmekaFields,
+} from "./utils/normalize.js";
+import { parseQuery } from "./utils/query.js";
+import { extractSnippets } from "./utils/snippets.js";
 import { OMEKA_API, PAGE_LIMIT } from "./env.js";
 import { getCache, setCache } from "./redis.js";
 
@@ -151,7 +151,7 @@ export async function getFeatured() {
       d.json().then((items) => {
         return items.map((item) => ({
           id: item["o:id"],
-          type: flattenType(item),
+          type: normalizeType(item),
           title: normalizeValue(item["dcterms:title"]),
           ...resolveLinkedProperties(item, filters),
           thumbnail: item.thumbnail_display_urls?.medium,
@@ -187,7 +187,7 @@ export async function getItem(id) {
   if (!res.ok) return { error: res };
 
   const json = await res.json();
-  const item = parseOmekaFields(json, filters);
+  const item = normalizeOmekaFields(json, filters);
 
   return await setCache(`item:${id}`, 60 * 60 * 12, item);
 }
@@ -230,7 +230,7 @@ export async function queryItems(id, query = {}) {
 
   const json = await res.json();
   const items = json.map((item) => {
-    item = parseOmekaFields(item, filters, { text: true });
+    item = normalizeOmekaFields(item, filters, { text: true });
     if (query.search) {
       item.snippets = extractSnippets(item, query.search);
     }
@@ -239,7 +239,7 @@ export async function queryItems(id, query = {}) {
     return item;
   });
 
-  const queryFilters = queryString ? formatItemFilters(items) : filters;
+  const queryFilters = queryString ? normalizeItemFilters(items) : filters;
 
   return await setCache(`/item/${id}?${queryString}`, 60 * 60 * 12, {
     items,
