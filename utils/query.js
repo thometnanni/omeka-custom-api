@@ -1,3 +1,4 @@
+import { PAGE_LIMIT } from "../env.js";
 import { filterConfig } from "../types.js";
 
 /**
@@ -38,7 +39,10 @@ export function parseQuery(query, offset = 0) {
     queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
   }
 
-  const page = query?.page?.trim() ?? 1;
+  const limit = query?.limit ?? PAGE_LIMIT;
+  queryStrings.push(`&per_page=${limit}`);
+
+  const page = query?.page ?? 1;
   queryStrings.push(`page=${encodeURIComponent(page)}`);
 
   return queryStrings.join("&");
