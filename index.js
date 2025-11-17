@@ -53,7 +53,12 @@ server.get("/featured", async (req) => {
   if (heroes.error) return reply.send(heroes.error);
 
   return localizeObject(
-    { featured, newItems, newsletters, heroes },
+    {
+      featured,
+      newItems: newItems.items,
+      newsletters: newsletters.items,
+      heroes,
+    },
     req.query.lang
   );
 });
