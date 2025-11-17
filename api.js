@@ -157,7 +157,10 @@ export async function getItem(id) {
   if (!res.ok) return { error: res };
 
   const json = await res.json();
-  const item = normalizeOmekaFields(json, filters, { description: true });
+  const item = normalizeOmekaFields(json, filters, {
+    description: true,
+    heroes: true,
+  });
 
   return await setCache(`item:${id}`, 60 * 60 * 12, item);
 }

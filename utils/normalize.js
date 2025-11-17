@@ -91,7 +91,7 @@ export function normalizeHtml(items) {
 export function normalizeOmekaFields(
   item,
   filters,
-  include = { text: false, description: false }
+  include = { text: false, description: false, heroes: false }
 ) {
   return omitNullish({
     id: item["o:id"],
@@ -104,6 +104,10 @@ export function normalizeOmekaFields(
     text: include.text && normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
     thumbnail: item.thumbnail_display_urls?.medium,
+    heroes: include.heroes &&
+      item.thumbnail_display_urls?.large && [
+        item.thumbnail_display_urls?.large,
+      ],
     ...resolveLinkedProperties(item, filters),
   });
 }
