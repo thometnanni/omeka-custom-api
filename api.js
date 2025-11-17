@@ -170,7 +170,7 @@ export async function getItemDetails(id) {
   if (cached) return cached;
   const item = await getItem(id);
 
-  if (item.media == null || item.media.length === 1) return [];
+  if (item.media == null || item.media.length < 1) return [];
 
   const res = await fetch(`${OMEKA_API}/media?id=${item.media.join(",")}`);
 
