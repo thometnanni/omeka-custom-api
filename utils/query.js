@@ -1,4 +1,4 @@
-import { PAGE_LIMIT } from "../env.js";
+import { PAGE_LIMIT, PAGE_MAX_LIMIT } from "../env.js";
 import { filterConfig } from "../types.js";
 
 /**
@@ -10,6 +10,12 @@ import { filterConfig } from "../types.js";
  */
 
 export function parseQuery(query, offset = 0) {
+  const isFiltered = Object.keys(query).find((key) =>
+    ["objectType", "creator", "theme", "era", "year", "search", "id"].includes(
+      key
+    )
+  );
+
   const filters = {
     objectType: (query?.objectType?.split(",") ?? []).sort(),
     creator: (query?.creator?.split(",") ?? []).sort(),
@@ -39,7 +45,7 @@ export function parseQuery(query, offset = 0) {
     queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
   }
 
-  const limit = query?.limit ?? PAGE_LIMIT;
+  const limit = query?.limit ?? isFiltered ? PAGE_MAX_LIMIT : PAGE_LIMIT;
   queryStrings.push(`per_page=${limit}`);
 
   const page = query?.page ?? 1;
@@ -50,12 +56,6 @@ export function parseQuery(query, offset = 0) {
   }
 
   const queryString = queryStrings.join("&");
-
-  const isFiltered = Object.keys(query).find((key) =>
-    ["objectType", "creator", "theme", "era", "year", "search", "id"].includes(
-      key
-    )
-  );
 
   return { queryString, isFiltered };
 }

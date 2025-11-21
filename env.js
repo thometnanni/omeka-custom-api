@@ -7,6 +7,7 @@ export const {
   OMEKA_API = "https://example.org/omeka/api",
   API_PORT = 3000,
   PAGE_LIMIT = 100,
+  PAGE_MAX_LIMIT = 10000,
   FEATURED_ITEM_SET = 4322,
   HEROES_ITEM_SET = 4329,
   NEWSLETTER_TYPE_ID = "4185",
