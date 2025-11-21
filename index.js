@@ -94,12 +94,19 @@ server.get("/page/:slug", async (req, reply) => {
 
 async function preload() {
   preloadFilters();
+  preloadCreators();
 }
 
 async function preloadFilters(force = false) {
   await getFilters(force);
-  const ttl = await ttlCache("/filters");
+  const ttl = await ttlCache("filters");
   setTimeout(preloadFilters, ttl * 0.95, true);
+}
+
+async function preloadCreators(force = false) {
+  await getCreators(force);
+  const ttl = await ttlCache("creators");
+  setTimeout(preloadCreators, ttl * 0.95, true);
 }
 
 // ---

@@ -104,16 +104,28 @@ export async function getFilterByType(type) {
 
 // FILTERS
 export async function getFilters(force = false) {
-  const cached = await getCache("/filters");
+  const cached = await getCache("filters");
   if (cached && !force) return cached;
   const filters = {
     year: await getFilterYears(),
-    creator: await getFilterByType("creator"),
     objectType: await getFilterByType("objectType"),
     theme: await getFilterByType("theme"),
     era: await getFilterByType("era"),
   };
-  return await setCache("/filters", 60 * 60 * 24, filters);
+  return await setCache("filters", 60 * 60 * 24, filters);
+}
+
+export async function getCreators(force = false) {
+  const cached = await getCache("creators");
+  if (cached && !force) return cached;
+
+  const allItems = await getAllItems();
+
+  const creators = allItems
+    .filter((item) => item["@type"].includes(types[type].term))
+    .map(normalizeOmekaFields);
+
+  return await setCache("creators", 60 * 60 * 24, creators);
 }
 
 // FEATURED
