@@ -6,6 +6,7 @@ import {
   normalizeItemFilters,
   normalizeOmekaFields,
   normalizeHero,
+  normalizePage,
 } from "./utils/normalize.js";
 import { parseQuery } from "./utils/query.js";
 import { extractSnippets } from "./utils/snippets.js";
@@ -13,6 +14,7 @@ import {
   FEATURED_ITEM_SET,
   HEROES_ITEM_SET,
   OMEKA_API,
+  OMEKA_SITE,
   PAGE_LIMIT,
 } from "./env.js";
 import { getCache, setCache } from "./redis.js";
@@ -222,4 +224,30 @@ export async function queryItems(id, query = {}) {
     items,
     filters: queryFilters,
   });
+}
+
+export async function getPage(slug, lang) {
+  const localSlug = `${slug}-${lang}`;
+
+  const cached = await getCache(`page:${localSlug}`);
+  if (cached) return cached;
+
+  const url = `${OMEKA_API}/site_pages?site=${OMEKA_SITE}&slug=${localSlug}`;
+
+  const res = await fetch(url);
+
+  if (!res.ok) return { error: res };
+
+  const json = await res.json();
+  const page = normalizePage(json);
+
+  if (page == null)
+    return {
+      error: {
+        statusCode: 404,
+        payload: "Page not found",
+      },
+    };
+
+  return await setCache(`page:${localSlug}`, 60 * 60 * 24, page);
 }

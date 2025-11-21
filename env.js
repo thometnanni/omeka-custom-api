@@ -10,4 +10,5 @@ export const {
   FEATURED_ITEM_SET = 4322,
   HEROES_ITEM_SET = 4329,
   NEWSLETTER_TYPE_ID = "4185",
+  OMEKA_SITE = "cua",
 } = process.env;

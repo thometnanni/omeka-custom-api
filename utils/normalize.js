@@ -145,6 +145,24 @@ export function normalizeItemFilters(items) {
   });
   return itemFilters;
 }
+
+/**
+ * Takes an omeka page array and returns title and html
+ * @param {Object} pages
+ * @returns {{title:string, html:string}}
+ */
+export function normalizePage(pages) {
+  if (pages == null || pages.length < 1) return null;
+  const page = pages[0];
+  const title = page["o:title"];
+  const html =
+    page["o:block"] &&
+    page["o:block"].find((block) => block["o:layout"] === "html")?.["o:data"]
+      ?.html;
+
+  return { title, html: he.decode(html) };
+}
+
 /**
  * For each known linked type, map the raw item's linked resources to an array of {title,id}.
  * Uses the provided filters lookup to resolve canonical titles by resource id.

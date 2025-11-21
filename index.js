@@ -10,6 +10,7 @@ import {
   getItemDetails,
   queryItems,
   getHeroes,
+  getPage,
 } from "./api.js";
 // ---
 // SETUP
@@ -79,6 +80,12 @@ server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
   const res = await queryItems(req.params.id, req.query);
   if (res.error) return reply.send(res.error);
   return localizeObject(res, req.query.lang);
+});
+
+server.get("/page/:slug", async (req, reply) => {
+  const res = await getPage(req.params.slug, req.query.lang);
+  if (res.error) return reply.send(res.error);
+  return res;
 });
 
 // ---
