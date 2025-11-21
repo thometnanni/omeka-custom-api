@@ -11,6 +11,7 @@ import {
   queryItems,
   getHeroes,
   getPage,
+  getCreators,
 } from "./api.js";
 // ---
 // SETUP

@@ -18,6 +18,8 @@ import {
   PAGE_LIMIT,
 } from "./env.js";
 import { getCache, setCache } from "./redis.js";
+import { retrieveCreators } from "./utils/retrieve.js";
+import { omitNullish } from "./utils/helper.js";
 
 let awaitingAllItems = false;
 
@@ -90,6 +92,7 @@ export async function getFilterByType(type) {
       const count = allItems.filter((item) =>
         item[property]?.find((creator) => creator.value_resource_id === id)
       ).length;
+
       return {
         id,
         title,
@@ -108,6 +111,7 @@ export async function getFilters(force = false) {
   if (cached && !force) return cached;
   const filters = {
     year: await getFilterYears(),
+    creator: await getFilterByType("creator"),
     objectType: await getFilterByType("objectType"),
     theme: await getFilterByType("theme"),
     era: await getFilterByType("era"),
@@ -122,7 +126,7 @@ export async function getCreators(force = false) {
   const allItems = await getAllItems();
 
   const creators = allItems
-    .filter((item) => item["@type"].includes(types[type].term))
+    .filter((item) => item["@type"].includes(types.creator.term))
     .map(normalizeOmekaFields);
 
   return await setCache("creators", 60 * 60 * 24, creators);
@@ -229,6 +233,10 @@ export async function queryItems(id, query = {}) {
 
     return item;
   });
+
+  const creators = await getCreators();
+
+  items.push(...retrieveCreators(items, creators, id));
 
   const queryFilters = queryString ? normalizeItemFilters(items) : filters;
 
