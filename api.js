@@ -210,9 +210,9 @@ export async function queryItems(id, query = {}) {
     query.id = item.items.join(",");
   }
 
-  const queryString = parseQuery(query);
+  const { queryString, isFiltered } = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
-  if (cached) return cached;
+  // if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
   const res = await fetch(url);
@@ -239,7 +239,7 @@ export async function queryItems(id, query = {}) {
 
   items.push(...retrieveCreators(items, creators, id));
 
-  const queryFilters = queryString ? normalizeItemFilters(items) : filters;
+  const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
     items,

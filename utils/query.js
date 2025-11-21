@@ -49,7 +49,15 @@ export function parseQuery(query, offset = 0) {
     queryStrings.push(`id=${encodeURIComponent(query.id)}`);
   }
 
-  return queryStrings.join("&");
+  const queryString = queryStrings.join("&");
+
+  const isFiltered = Object.keys(query).find((key) =>
+    ["objectType", "creator", "theme", "era", "year", "search", "id"].includes(
+      key
+    )
+  );
+
+  return { queryString, isFiltered };
 }
 /**
  * Build a single property[] query fragment used by the API.
