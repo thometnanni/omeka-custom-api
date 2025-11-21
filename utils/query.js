@@ -40,10 +40,14 @@ export function parseQuery(query, offset = 0) {
   }
 
   const limit = query?.limit ?? PAGE_LIMIT;
-  queryStrings.push(`&per_page=${limit}`);
+  queryStrings.push(`per_page=${limit}`);
 
   const page = query?.page ?? 1;
   queryStrings.push(`page=${encodeURIComponent(page)}`);
+
+  if (query?.id) {
+    queryStrings.push(`id=${encodeURIComponent(query.id)}`);
+  }
 
   return queryStrings.join("&");
 }

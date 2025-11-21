@@ -24,6 +24,20 @@ export function normalizeValue(property) {
 
   return safeTrim(property?.["@value"] ?? property);
 }
+
+/**
+ * Normalize an Omeka reverse items objectinto an array of ids
+ * @param {Object} reverse
+ * @returns {[number]}
+ */
+
+export function normalizeReverseItems(reverse) {
+  if (reverse == null) return null;
+
+  const items = Object.values(reverse).flat();
+
+  return items.map(({ "@id": id }) => +id.match(/[0-9]+$/g)?.[0]);
+}
 /**
  * Determine the content type key for an item by matching its @type to entries in `types`.
  * Returns a key like "creator", "objectType", etc., or "object" as a fallback.
@@ -91,7 +105,7 @@ export function normalizeHtml(items) {
 export function normalizeOmekaFields(
   item,
   filters,
-  include = { text: false, description: false, heroes: false }
+  include = { text: false, description: false, heroes: false, items: false }
 ) {
   return omitNullish({
     id: item["o:id"],
@@ -108,6 +122,7 @@ export function normalizeOmekaFields(
       item.thumbnail_display_urls?.large && [
         item.thumbnail_display_urls?.large,
       ],
+    items: include.items && normalizeReverseItems(item["@reverse"]),
     ...resolveLinkedProperties(item, filters),
   });
 }

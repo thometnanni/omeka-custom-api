@@ -178,6 +178,7 @@ export async function getItem(id) {
   const item = normalizeOmekaFields(json, filters, {
     description: true,
     heroes: true,
+    items: true,
   });
 
   return await setCache(`item:${id}`, 60 * 60 * 12, item);
@@ -205,8 +206,8 @@ export async function getItemDetails(id) {
 export async function queryItems(id, query = {}) {
   if (id != null) {
     const item = await getItem(id);
-    if (!Object.keys(types).includes(item.type)) return {};
-    query[item.type] = query[item.type] ? `${query[item.type]},${id}` : id;
+    if (item.items == null || item.items.length < 1) return {};
+    query.id = item.items.join(",");
   }
 
   const queryString = parseQuery(query);
