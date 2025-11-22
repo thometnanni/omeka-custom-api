@@ -154,8 +154,10 @@ export function normalizeItemFilters(items) {
       });
     });
 
-    itemFilters.year[item.published] = itemFilters.year[item.published]
-      ? itemFilters.year[item.published] + 1
+    const year = item["dcterms:date"]?.[0]?.["@value"]?.split("-")[0];
+
+    itemFilters.year[year] = itemFilters.year[year]
+      ? itemFilters.year[year] + 1
       : 1;
   });
   return itemFilters;
