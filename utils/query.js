@@ -57,7 +57,7 @@ export function parseQuery(query, offset = 0) {
 
   const queryString = queryStrings.join("&");
 
-  return { queryString, isFiltered };
+  return { queryString, isFiltered, limit };
 }
 /**
  * Build a single property[] query fragment used by the API.

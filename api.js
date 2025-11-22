@@ -210,7 +210,7 @@ export async function queryItems(id, query = {}) {
     query.id = item.items.join(",");
   }
 
-  const { queryString, isFiltered } = parseQuery(query);
+  const { queryString, isFiltered, limit } = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
   if (cached) return cached;
 
@@ -235,6 +235,8 @@ export async function queryItems(id, query = {}) {
     return item;
   });
 
+  const hasNextPage = items.length >= limit;
+
   const creators = await getCreators();
 
   items.push(...retrieveCreators(items, creators, id));
@@ -244,6 +246,7 @@ export async function queryItems(id, query = {}) {
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
     items,
     filters: queryFilters,
+    hasNextPage,
   });
 }
 
