@@ -42,7 +42,7 @@ server.get("/featured", async (req) => {
   const featured = await getFeatured();
   if (featured.error) return reply.send(featured.error);
 
-  const newItems = await queryItems(null, { limit: 10 });
+  const newItems = await queryItems(null, { limit: 50 });
   if (newItems.error) return reply.send(newItems.error);
 
   const newsletters = await queryItems(null, {
@@ -57,7 +57,7 @@ server.get("/featured", async (req) => {
   return localizeObject(
     {
       featured,
-      newItems: newItems.items,
+      newItems: newItems.items.slice(0, 10),
       newsletters: newsletters.items,
       heroes,
     },

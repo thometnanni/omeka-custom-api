@@ -241,10 +241,14 @@ export async function queryItems(id, query = {}) {
 
   items.push(...retrieveCreators(items, creators, id));
 
+  const objectsAndCreators = items.filter(
+    ({ type }) => type === "creator" || type === "object"
+  );
+
   const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
-    items,
+    items: objectsAndCreators,
     filters: queryFilters,
     hasNextPage,
   });
