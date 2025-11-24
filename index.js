@@ -38,7 +38,7 @@ server.get("/filters", async (req, res) => {
   return localizeObject(await getFilters(), req.query?.lang);
 });
 
-server.get("/featured", async (req) => {
+server.get("/featured", async (req, reply) => {
   const featured = await getFeatured();
   if (featured.error) return reply.send(featured.error);
 
@@ -50,6 +50,8 @@ server.get("/featured", async (req) => {
     objectType: NEWSLETTER_TYPE_ID,
   });
   if (newsletters.error) return reply.send(newsletters.error);
+
+  console.log(newsletters.items.length);
 
   const heroes = await getHeroes();
   if (heroes.error) return reply.send(heroes.error);

@@ -12,4 +12,6 @@ export const {
   HEROES_ITEM_SET = 4329,
   NEWSLETTER_TYPE_ID = "4185",
   OMEKA_SITE = "cua",
+  OMEKA_FILE_URL_REPLACEMENT = "", // = "https://cua-files.git-87a.workers.dev",
+  OMEKA_FILE_URL = "", // = "https://minjian-danganguan.org/files",
 } = process.env;

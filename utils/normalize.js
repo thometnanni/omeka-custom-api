@@ -1,6 +1,7 @@
 import he from "he";
 import { types, filterConfig } from "../types.js";
 import { omitNullish } from "./helper.js";
+import { OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT } from "../env.js";
 
 /**
  * Normalize a value from the API into a language-indexed object or single value
@@ -74,7 +75,7 @@ export function normalizeMedia(items) {
         "o:source": filename,
         "o:original_url": url,
         "o:media_type": type,
-      }) => ({ filename, url, type })
+      }) => ({ filename, url: overwriteFileUrl(url), type })
     );
 
   if (mediaItems.length === 0) return null;
@@ -117,10 +118,10 @@ export function normalizeOmekaFields(
     published: normalizeValue(item["dcterms:date"]),
     text: include.text && normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
-    thumbnail: item.thumbnail_display_urls?.medium,
+    thumbnail: overwriteFileUrl(item.thumbnail_display_urls?.medium),
     heroes: include.heroes &&
       item.thumbnail_display_urls?.large && [
-        item.thumbnail_display_urls?.large,
+        overwriteFileUrl(item.thumbnail_display_urls?.large),
       ],
     items: include.items && normalizeReverseItems(item["@reverse"]),
     ...resolveLinkedProperties(item, filters),
@@ -128,7 +129,7 @@ export function normalizeOmekaFields(
 }
 
 export function normalizeHero(item) {
-  return item.thumbnail_display_urls?.large;
+  return overwriteFileUrl(item.thumbnail_display_urls?.large);
 }
 /**
  * Generate counts for UI filters from a list of formatted items.
@@ -218,4 +219,10 @@ function safeTrim(value) {
     return value.trim();
   }
   return value;
+}
+
+export function overwriteFileUrl(url) {
+  if (!OMEKA_FILE_URL_REPLACEMENT || !OMEKA_FILE_URL || !url) return url;
+
+  return url.replace(OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT);
 }
