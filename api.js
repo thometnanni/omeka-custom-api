@@ -216,7 +216,7 @@ export async function queryItems(
 
   const { queryString, isFiltered, limit } = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
-  // if (cached) return cached;
+  if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
   const res = await fetch(url);
