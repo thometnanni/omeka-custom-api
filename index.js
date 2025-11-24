@@ -42,16 +42,22 @@ server.get("/featured", async (req, reply) => {
   const featured = await getFeatured();
   if (featured.error) return reply.send(featured.error);
 
-  const newItems = await queryItems(null, { limit: 50 });
+  const newItems = await queryItems(
+    null,
+    { limit: 50 },
+    { retrieveCreators: false }
+  );
   if (newItems.error) return reply.send(newItems.error);
 
-  const newsletters = await queryItems(null, {
-    limit: 10,
-    objectType: NEWSLETTER_TYPE_ID,
-  });
+  const newsletters = await queryItems(
+    null,
+    {
+      limit: 10,
+      objectType: NEWSLETTER_TYPE_ID,
+    },
+    { retrieveCreators: false }
+  );
   if (newsletters.error) return reply.send(newsletters.error);
-
-  console.log(newsletters.items.length);
 
   const heroes = await getHeroes();
   if (heroes.error) return reply.send(heroes.error);

@@ -45,7 +45,8 @@ export function parseQuery(query, offset = 0) {
     queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
   }
 
-  const limit = query?.limit ?? isFiltered ? PAGE_MAX_LIMIT : PAGE_LIMIT;
+  const limit = query?.limit ?? (isFiltered ? PAGE_MAX_LIMIT : PAGE_LIMIT);
+
   queryStrings.push(`per_page=${limit}`);
 
   const page = query?.page ?? 1;

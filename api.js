@@ -203,7 +203,11 @@ export async function getItemDetails(id) {
   return await setCache(`item:details:${id}`, 60 * 60 * 12, { media, html });
 }
 
-export async function queryItems(id, query = {}) {
+export async function queryItems(
+  id,
+  query = {},
+  options = { retrieveCreators: true }
+) {
   if (id != null) {
     const item = await getItem(id);
     if (item.items == null || item.items.length < 1) return {};
@@ -212,7 +216,7 @@ export async function queryItems(id, query = {}) {
 
   const { queryString, isFiltered, limit } = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
-  if (cached) return cached;
+  // if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
   const res = await fetch(url);
@@ -237,9 +241,10 @@ export async function queryItems(id, query = {}) {
 
   const hasNextPage = items.length >= limit;
 
-  const creators = await getCreators();
-
-  items.push(...retrieveCreators(items, creators, id));
+  if (options.retrieveCreators) {
+    const creators = await getCreators();
+    items.push(...retrieveCreators(items, creators, id));
+  }
 
   const objectsAndCreators = items.filter(
     ({ type }) => type === "creator" || type === "object"
