@@ -11,6 +11,9 @@ export function extractSnippets(item, search) {
 
   const snippets = [
     ...matchWithContext(item.description, regex),
+    ...Object.values(item.description ?? {})
+      .map((value) => matchWithContext(value, regex))
+      .flat(),
     ...matchWithContext(item.text, regex),
   ];
 
