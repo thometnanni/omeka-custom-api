@@ -192,16 +192,20 @@ export function normalizePage(pages) {
 export function resolveLinkedProperties(item, filters) {
   return Object.fromEntries(
     Object.entries(types).map(([name, type]) => {
-      const values = item[type.property]?.map(
-        ({ value_resource_id: value }) => {
-          const { title, id } =
-            filters[name]?.find(({ id }) => id === value) ?? {};
+      const values = item[type.property]
+        ?.map(({ value_resource_id: value }) => {
+          const linkedItem = filters[name]?.find(({ id }) => id === value);
+
+          if (linkedItem == null) return;
+
+          const { title, id } = linkedItem;
+
           return {
             title,
             id,
           };
-        }
-      );
+        })
+        .filter(Boolean);
       return [name, values];
     })
   );
