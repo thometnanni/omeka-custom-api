@@ -106,6 +106,7 @@ export function normalizeHtml(items) {
 export function normalizeOmekaFields(
   item,
   filters,
+  creatorObjectTypes = {},
   include = { text: false, description: false, heroes: false, items: false }
 ) {
   return omitNullish({
@@ -125,6 +126,7 @@ export function normalizeOmekaFields(
       ],
     items: include.items && normalizeReverseItems(item["@reverse"]),
     ...resolveLinkedProperties(item, filters),
+    objectTypes: creatorObjectTypes[item["o:id"]],
   });
 }
 

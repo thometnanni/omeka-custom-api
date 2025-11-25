@@ -121,15 +121,43 @@ export async function getFilters(force = false) {
 
 export async function getCreators(force = false) {
   const cached = await getCache("creators");
-  if (cached && !force) return cached;
+  // if (cached && !force) return cached;
 
-  const allItems = await getAllItems();
+  const items = await getAllItems();
 
-  const creators = allItems
-    .filter((item) => item["@type"].includes(types.creator.term))
-    .map(normalizeOmekaFields);
+  const filters = await getFilters();
+  const normalizedItems = items.map((item) =>
+    normalizeOmekaFields(item, filters)
+  );
 
-  return await setCache("creators", 60 * 60 * 24, creators);
+  const creators = normalizedItems
+    .filter(({ type }) => type === "creator")
+    .map((creator) => {
+      const objectTypes = {};
+      normalizedItems
+        .filter(({ creator: objectCreator, objectType }) => {
+          if (!objectCreator || !objectType) return;
+          return objectCreator.map(({ id }) => id).includes(creator.id);
+        })
+        .forEach(({ objectType }) => {
+          objectType.forEach((ot) => {
+            objectTypes[ot.id] = objectTypes[ot.id]
+              ? objectTypes[ot.id] + 1
+              : 1;
+          });
+        });
+
+      return { ...creator, objectTypes };
+    });
+
+  const creatorObjectTypes = Object.fromEntries(
+    creators.map(({ id, objectTypes }) => [id, objectTypes])
+  );
+
+  return await setCache("creators", 60 * 60 * 24, {
+    creators,
+    creatorObjectTypes,
+  });
 }
 
 // FEATURED
@@ -143,8 +171,12 @@ export async function getFeatured() {
   if (!res.ok) return { error: res };
   const filters = await getFilters();
 
+  const { creatorObjectTypes } = await getCreators();
+
   const json = await res.json();
-  const featured = json.map((item) => normalizeOmekaFields(item, filters));
+  const featured = json.map((item) =>
+    normalizeOmekaFields(item, filters, creatorObjectTypes)
+  );
 
   return await setCache("featured", 60 * 60 * 24, featured);
 }
@@ -174,8 +206,10 @@ export async function getItem(id) {
 
   if (!res.ok) return { error: res };
 
+  const { creatorObjectTypes } = await getCreators();
+
   const json = await res.json();
-  const item = normalizeOmekaFields(json, filters, {
+  const item = normalizeOmekaFields(json, filters, creatorObjectTypes, {
     description: true,
     heroes: true,
     items: true,
@@ -216,7 +250,7 @@ export async function queryItems(
 
   const { queryString, isFiltered, limit } = parseQuery(query);
   const cached = await getCache(`query:${queryString}`);
-  if (cached) return cached;
+  // if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
   const res = await fetch(url);
@@ -224,9 +258,11 @@ export async function queryItems(
   if (!res.ok) return { error: res };
   const filters = await getFilters();
 
+  const { creators, creatorObjectTypes } = await getCreators();
+
   const json = await res.json();
   const items = json.map((item) => {
-    item = normalizeOmekaFields(item, filters, {
+    item = normalizeOmekaFields(item, filters, creatorObjectTypes, {
       text: true,
       description: true,
     });
@@ -242,7 +278,6 @@ export async function queryItems(
   const hasNextPage = items.length >= limit;
 
   if (options.retrieveCreators) {
-    const creators = await getCreators();
     items.push(...retrieveCreators(items, creators, id));
   }
 

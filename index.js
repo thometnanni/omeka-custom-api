@@ -79,6 +79,12 @@ server.get("/item/:id(^[0-9]+$)", async (req, reply) => {
   return localizeObject(res, req.query.lang);
 });
 
+server.get("/creators", async (req, reply) => {
+  const res = await getCreators();
+  if (res.error) return reply.send(res.error);
+  return localizeObject(res, req.query.lang);
+});
+
 server.get("/item-details/:id(^[0-9]+$)", async (req, reply) => {
   const res = await getItemDetails(req.params.id);
   if (res.error) return reply.send(res.error);
