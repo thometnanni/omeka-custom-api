@@ -1,5 +1,6 @@
 import { PAGE_LIMIT, PAGE_MAX_LIMIT } from "../env.js";
 import { filterConfig } from "../types.js";
+import { normalizeSearchString } from "./normalize.js";
 
 /**
  * Convert a query object with comma-separated filter values into an API query string.
@@ -9,19 +10,14 @@ import { filterConfig } from "../types.js";
  * @returns {string}
  */
 
-export function parseQuery(query, offset = 0) {
-  const isFiltered = Object.keys(query).find((key) =>
-    ["objectType", "creator", "theme", "era", "year", "search", "id"].includes(
-      key
-    )
-  );
-
+export function parseQuery(query) {
   const filters = {
     objectType: (query?.objectType?.split(",") ?? []).sort(),
     creator: (query?.creator?.split(",") ?? []).sort(),
     theme: (query?.theme?.split(",") ?? []).sort(),
     era: (query?.era?.split(",") ?? []).sort(),
     year: (query?.year?.split(",") ?? []).sort(),
+    search: normalizeSearchString(query?.search),
   };
 
   const queryStrings = Object.entries(filters)
@@ -36,14 +32,10 @@ export function parseQuery(query, offset = 0) {
     )
     .flat()
     .map(({ property, value, searchType }, i) =>
-      filterQuery(property, value, offset + i, searchType)
+      filterQuery(property, value, i, searchType)
     );
 
-  const search = query?.search?.trim();
-
-  if (search) {
-    queryStrings.push(`fulltext_search=${encodeURIComponent(search)}`);
-  }
+  const isFiltered = queryStrings.length > 0;
 
   const limit = query?.limit ?? (isFiltered ? PAGE_MAX_LIMIT : PAGE_LIMIT);
 

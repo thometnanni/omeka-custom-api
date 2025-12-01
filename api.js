@@ -7,6 +7,7 @@ import {
   normalizeOmekaFields,
   normalizeHero,
   normalizePage,
+  normalizeSearchString,
 } from "./utils/normalize.js";
 import { parseQuery } from "./utils/query.js";
 import { extractSnippets } from "./utils/snippets.js";
@@ -230,7 +231,7 @@ export async function queryItems(
       text: true,
       description: true,
     });
-    if (query.search) {
+    if (normalizeSearchString(query.search).length > 0) {
       item.snippets = extractSnippets(item, query.search);
     }
     delete item.text;

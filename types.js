@@ -26,4 +26,5 @@ export const types = {
 export const filterConfig = {
   ...types,
   year: { property: "dcterms:date", searchType: "sw" },
+  search: { property: "0", searchType: "in" },
 };

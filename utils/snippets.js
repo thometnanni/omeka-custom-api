@@ -1,3 +1,4 @@
+import { normalizeSearchString } from "./normalize.js";
 /**
  * Extract text snippets around matches of the search terms in the text.
  *
@@ -26,11 +27,8 @@ export function extractSnippets(item, search) {
  * @returns {RegExp}   – The converted regex
  */
 function searchToRegex(str) {
-  // Match either a quoted part ("…") or a run of non‑space chars.
-  const tokenRegex = /"([^"]*)"|(\S+)/g;
-
-  const matches = str.match(tokenRegex);
-  const terms = matches.map((match) =>
+  const searchStrings = normalizeSearchString(str);
+  const terms = searchStrings.map((match) =>
     match
       // remove quotation marks
       .replace(/"/g, "")

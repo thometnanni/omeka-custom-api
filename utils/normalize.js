@@ -230,3 +230,20 @@ export function overwriteFileUrl(url) {
 
   return url.replace(OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT);
 }
+
+/**
+ * takes a string of comma seperated strings and returns a filtered array of values, that are
+ * - more than 3 characters
+ * or
+ * - chinese characters
+ *
+ * @param {string} searchString
+ * @returns {[string]}
+ */
+export function normalizeSearchString(searchString) {
+  return (
+    searchString
+      ?.split(",")
+      .filter((str) => str.length >= 3 || /\p{Script=Han}/u.test(str)) ?? []
+  ).sort();
+}
