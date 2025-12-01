@@ -35,6 +35,10 @@ export function parseQuery(query) {
       filterQuery(property, value, i, searchType)
     );
 
+  if (query?.id) {
+    queryStrings.push(`id=${encodeURIComponent(query.id)}`);
+  }
+
   const isFiltered = queryStrings.length > 0;
 
   const limit = query?.limit ?? (isFiltered ? PAGE_MAX_LIMIT : PAGE_LIMIT);
@@ -43,10 +47,6 @@ export function parseQuery(query) {
 
   const page = query?.page ?? 1;
   queryStrings.push(`page=${encodeURIComponent(page)}`);
-
-  if (query?.id) {
-    queryStrings.push(`id=${encodeURIComponent(query.id)}`);
-  }
 
   const queryString = queryStrings.join("&");
 
