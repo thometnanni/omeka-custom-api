@@ -8,6 +8,7 @@ import {
   normalizeHero,
   normalizePage,
   normalizeSearchString,
+  normalizeType,
 } from "./utils/normalize.js";
 import { parseQuery } from "./utils/query.js";
 import { extractSnippets } from "./utils/snippets.js";
@@ -144,6 +145,29 @@ export async function getCreators(force = false) {
   return await setCache("creators", 60 * 60 * 24, creators);
 }
 
+export async function getCounts(force = false) {
+  const cached = await getCache("counts");
+  // if (cached && !force) return cached;
+
+  const allItems = await getAllItems();
+  const allItemsButIssues = allItems.filter(
+    ({ "curation:category": categories }) => {
+      return (
+        categories == null ||
+        !categories.map(({ value_resource_id: id }) => id).includes(4561)
+      );
+    }
+  );
+
+  const types = allItemsButIssues.map(normalizeType);
+
+  const counts = {
+    creators: types.filter((type) => type === "creator").length,
+    objects: types.filter((type) => type === "object").length,
+  };
+  return await setCache("counts", 60 * 60 * 24, counts);
+}
+
 // FEATURED
 export async function getFeatured() {
   const cached = await getCache("featured");
@@ -258,16 +282,27 @@ export async function queryItems(
     items.push(...retrieveCreators(items, creators, id));
   }
 
-  const objectsAndCreators = items.filter(
-    ({ type }) => type === "creator" || type === "object"
-  );
+  const creators = items.filter(({ type }) => type === "creator");
+  const objects = items.filter(({ type }) => type === "object");
+
+  const counts = {
+    creators: creators.length,
+    objects: objects.length,
+  };
+
+  if (hasNextPage) {
+    const totalCounts = await getCounts();
+    counts.creators = totalCounts.creators;
+    counts.objects = totalCounts.objects;
+  }
 
   const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
-    items: objectsAndCreators,
+    items: [...objects, ...creators],
     filters: queryFilters,
     hasNextPage,
+    counts,
   });
 }
 

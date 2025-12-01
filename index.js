@@ -12,6 +12,7 @@ import {
   getHeroes,
   getPage,
   getCreators,
+  getCounts,
 } from "./api.js";
 // ---
 // SETUP
@@ -104,6 +105,7 @@ server.get("/page/:slug", async (req, reply) => {
 async function preload() {
   preloadFilters();
   preloadCreators();
+  preloadCounts();
 }
 
 async function preloadFilters(force = false) {
@@ -116,6 +118,12 @@ async function preloadCreators(force = false) {
   await getCreators(force);
   const ttl = await ttlCache("creators");
   setTimeout(preloadCreators, ttl * 0.95, true);
+}
+
+async function preloadCounts(force = false) {
+  await getCounts(force);
+  const ttl = await ttlCache("counts");
+  setTimeout(preloadCounts, ttl * 0.95, true);
 }
 
 // ---
