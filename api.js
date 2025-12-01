@@ -59,8 +59,7 @@ export async function getAllItems() {
 }
 
 // FILTER: YEARS
-export async function getFilterYears() {
-  const allItems = await getAllItems();
+export async function getFilterYears(allItems) {
   const years = {};
 
   allItems.forEach((item) => {
@@ -81,9 +80,8 @@ export async function getFilterYears() {
 }
 
 // FILTER: BY TYPE
-export async function getFilterByType(type) {
+export async function getFilterByType(type, allItems) {
   const { term, property } = types[type];
-  const allItems = await getAllItems();
 
   const items = allItems
     .filter((item) => item["@type"].includes(term))
@@ -110,12 +108,25 @@ export async function getFilterByType(type) {
 export async function getFilters(force = false) {
   const cached = await getCache("filters");
   if (cached && !force) return cached;
+
+  const allItems = await getAllItems();
+  const allItemsButIssues = allItems.filter(
+    ({ "curation:category": categories }) => {
+      return (
+        categories == null ||
+        !categories.map(({ value_resource_id: id }) => id).includes(4561)
+      );
+    }
+  );
+
   const filters = {
-    year: await getFilterYears(),
-    creator: await getFilterByType("creator"),
-    objectType: await getFilterByType("objectType"),
-    theme: await getFilterByType("theme"),
-    era: await getFilterByType("era"),
+    year: await getFilterYears(allItemsButIssues),
+    creator: await getFilterByType("creator", allItemsButIssues),
+    objectType: (await getFilterByType("objectType", allItems)).map((filter) =>
+      filter.id === 4561 ? { ...filter, count: 0 } : filter
+    ),
+    theme: await getFilterByType("theme", allItemsButIssues),
+    era: await getFilterByType("era", allItemsButIssues),
   };
   return await setCache("filters", 60 * 60 * 24, filters);
 }
