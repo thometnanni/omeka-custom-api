@@ -75,7 +75,14 @@ export function normalizeMedia(items) {
         "o:source": filename,
         "o:original_url": url,
         "o:media_type": type,
-      }) => ({ filename, url: overwriteFileUrl(url), type })
+        "dcterms:title": title,
+      }) =>
+        omitNullish({
+          filename,
+          url: overwriteFileUrl(url),
+          type,
+          title: normalizeValue(title) ?? filename.replace(/^.+\//, ""),
+        })
     );
 
   if (mediaItems.length === 0) return null;
