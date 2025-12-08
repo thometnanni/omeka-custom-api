@@ -45,7 +45,7 @@ server.get("/featured", async (req, reply) => {
 
   const newItems = await queryItems(
     null,
-    { limit: 50 },
+    { limit: 11 },
     { retrieveCreators: false }
   );
   if (newItems.error) return reply.send(newItems.error);
@@ -53,7 +53,7 @@ server.get("/featured", async (req, reply) => {
   const newsletters = await queryItems(
     null,
     {
-      limit: 10,
+      limit: 20,
       objectType: NEWSLETTER_TYPE_ID,
     },
     { retrieveCreators: false }
@@ -65,8 +65,12 @@ server.get("/featured", async (req, reply) => {
 
   return localizeObject(
     {
-      featured,
-      newItems: newItems.items.slice(0, 10),
+      featured: featured
+        .map((value) => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value)
+        .slice(0, 12),
+      newItems: newItems.items,
       newsletters: newsletters.items,
       heroes,
     },
