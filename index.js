@@ -45,7 +45,7 @@ server.get("/featured", async (req, reply) => {
 
   const newItems = await queryItems(
     null,
-    { limit: 11 },
+    { limit: 50 },
     { retrieveCreators: false }
   );
   if (newItems.error) return reply.send(newItems.error);
@@ -70,7 +70,7 @@ server.get("/featured", async (req, reply) => {
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value)
         .slice(0, 12),
-      newItems: newItems.items,
+      newItems: newItems.items.slice(0, 11),
       newsletters: newsletters.items,
       heroes,
     },
