@@ -23,6 +23,11 @@ import { getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
 import { localizeObject } from "./utils/helper.js";
 
+const collators = {
+  en: new Intl.Collator("en", { sensitivity: "base", numeric: true }),
+  zh: new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base" }),
+};
+
 let awaitingAllItems = false;
 
 export async function getAllItems() {
@@ -298,12 +303,14 @@ export async function queryItems(
 
   const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
+  const lang = query.lang ?? "en";
   const sortedCreators = (options.removeCreators ? [] : creators).toSorted(
     (a, b) => {
-      const localA = localizeObject(a.title, query.lang);
-      const localB = localizeObject(b.title, query.lang);
+      const localA = localizeObject(a.title, lang);
+      const localB = localizeObject(b.title, lang);
 
-      return localA < localB ? -1 : 1;
+      // collators[lang].compare(localA, localB)
+      return collators[lang].compare(localA, localB);
     },
   );
 
@@ -324,11 +331,12 @@ export async function queryCreators(query = {}) {
     ...totalCounts,
   };
 
+  const lang = query.lang ?? "en";
   const items = creators.toSorted((a, b) => {
-    const localA = localizeObject(a.title, query.lang);
-    const localB = localizeObject(b.title, query.lang);
+    const localA = localizeObject(a.title, lang);
+    const localB = localizeObject(b.title, lang);
 
-    return localA < localB ? -1 : 1;
+    return collators[lang].compare(localA, localB);
   });
 
   return {
