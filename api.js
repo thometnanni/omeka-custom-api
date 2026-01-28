@@ -21,7 +21,7 @@ import {
 } from "./env.js";
 import { getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
-import { omitNullish } from "./utils/helper.js";
+import { localizeObject } from "./utils/helper.js";
 
 let awaitingAllItems = false;
 
@@ -40,7 +40,7 @@ export async function getAllItems() {
 
   while (true) {
     const response = await fetch(
-      `${OMEKA_API}/items?page=${page}&per_page=${PAGE_LIMIT}`
+      `${OMEKA_API}/items?page=${page}&per_page=${PAGE_LIMIT}`,
     );
     const data = await response.json();
 
@@ -90,7 +90,7 @@ export async function getFilterByType(type, allItems) {
       const title = normalizeValue(item["dcterms:title"]);
       const id = item["o:id"];
       const count = allItems.filter((item) =>
-        item[property]?.find((creator) => creator.value_resource_id === id)
+        item[property]?.find((creator) => creator.value_resource_id === id),
       ).length;
 
       return {
@@ -117,14 +117,14 @@ export async function getFilters(force = false) {
         categories == null ||
         !categories.map(({ value_resource_id: id }) => id).includes(4561)
       );
-    }
+    },
   );
 
   const filters = {
     year: await getFilterYears(allItemsButIssues),
     creator: await getFilterByType("creator", allItemsButIssues),
     objectType: (await getFilterByType("objectType", allItems)).map((filter) =>
-      filter.id === 4561 ? { ...filter, count: 0 } : filter
+      filter.id === 4561 ? { ...filter, count: 0 } : filter,
     ),
     theme: await getFilterByType("theme", allItemsButIssues),
     era: await getFilterByType("era", allItemsButIssues),
@@ -156,7 +156,7 @@ export async function getCounts(force = false) {
         categories == null ||
         !categories.map(({ value_resource_id: id }) => id).includes(4561)
       );
-    }
+    },
   );
 
   const types = allItemsButIssues.map(normalizeType);
@@ -242,7 +242,7 @@ export async function getItemDetails(id) {
 export async function queryItems(
   id,
   query = {},
-  options = { retrieveCreators: true }
+  options = { retrieveCreators: true, removeCreators: false },
 ) {
   if (id != null) {
     const item = await getItem(id);
@@ -298,12 +298,45 @@ export async function queryItems(
 
   const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
+  const sortedCreators = (options.removeCreators ? [] : creators).toSorted(
+    (a, b) => {
+      const localA = localizeObject(a.title, query.lang);
+      const localB = localizeObject(b.title, query.lang);
+
+      return localA < localB ? -1 : 1;
+    },
+  );
+
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
-    items: [...objects, ...creators],
+    items: [...objects, ...sortedCreators],
     filters: queryFilters,
     hasNextPage,
     counts,
   });
+}
+
+export async function queryCreators(query = {}) {
+  const creators = await getCreators();
+
+  const hasNextPage = false;
+  const totalCounts = await getCounts();
+  const counts = {
+    ...totalCounts,
+  };
+
+  const items = creators.toSorted((a, b) => {
+    const localA = localizeObject(a.title, query.lang);
+    const localB = localizeObject(b.title, query.lang);
+
+    return localA < localB ? -1 : 1;
+  });
+
+  return {
+    items,
+    filters: null,
+    hasNextPage,
+    counts,
+  };
 }
 
 export async function getPage(slug, lang) {

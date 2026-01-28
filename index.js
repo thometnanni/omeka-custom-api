@@ -9,6 +9,7 @@ import {
   getItem,
   getItemDetails,
   queryItems,
+  queryCreators,
   getHeroes,
   getPage,
   getCreators,
@@ -46,7 +47,7 @@ server.get("/featured", async (req, reply) => {
   const newItems = await queryItems(
     null,
     { limit: 50 },
-    { retrieveCreators: false }
+    { retrieveCreators: false },
   );
   if (newItems.error) return reply.send(newItems.error);
 
@@ -56,7 +57,7 @@ server.get("/featured", async (req, reply) => {
       limit: 20,
       objectType: NEWSLETTER_TYPE_ID,
     },
-    { retrieveCreators: false }
+    { retrieveCreators: false },
   );
   if (newsletters.error) return reply.send(newsletters.error);
 
@@ -74,7 +75,7 @@ server.get("/featured", async (req, reply) => {
       newsletters: newsletters.items,
       heroes,
     },
-    req.query.lang
+    req.query.lang,
   );
 });
 
@@ -91,7 +92,17 @@ server.get("/item-details/:id(^[0-9]+$)", async (req, reply) => {
 });
 
 server.get("/query/:id(^[0-9]+$)", async (req, reply) => {
-  const res = await queryItems(req.params.id, req.query);
+  const isOnMainPage = !Object.keys(req.query).find(
+    (key) => !["view", "page", "lang"].includes(key),
+  );
+  const isOnMainCreatorPage = req.query.view === "creator" && isOnMainPage;
+
+  const res = isOnMainCreatorPage
+    ? await queryCreators(req.query)
+    : await queryItems(req.params.id, req.query, {
+        retrieveCreators: !isOnMainPage,
+        removeCreators: isOnMainPage,
+      });
   if (res.error) return reply.send(res.error);
   return localizeObject(res, req.query.lang);
 });
