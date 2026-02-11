@@ -8,22 +8,20 @@ services:
       - "8001:3000"
     depends_on:
       - cua_redis
-    volumes:
-      - ./:/app # bind‑mount the repo (useful for dev); omit for production
 
-cua_redis:
-  image: redis:8.6-alpine # official lightweight Redis image
-  container_name: cua_redis
-  restart: unless-stopped
-  # Persist data between container restarts
-  volumes:
-    - redis-data:/data
-  # Expose the port only if you need to reach Redis from the host
-  # (omit the next line for a pure internal service)
-  # ports:
-  #   - "6379:6379"
-  healthcheck:
-    test: ["CMD", "redis-cli", "ping"]
-    interval: 10s
-    timeout: 5s
-    retries: 3
+  cua_redis:
+    image: redis:8.6-alpine # official lightweight Redis image
+    container_name: cua_redis
+    restart: unless-stopped
+    # Persist data between container restarts
+    volumes:
+      - redis-data:/data
+    # Expose the port only if you need to reach Redis from the host
+    # (omit the next line for a pure internal service)
+    # ports:
+    #   - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
