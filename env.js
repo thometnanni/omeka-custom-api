@@ -6,6 +6,7 @@ export const {
   ORIGIN = "/^https?://localhost:[0-9]{1,5}$/",
   OMEKA_API = "https://example.org/omeka/api",
   API_PORT = 3000,
+  API_HOST = "0.0.0.0",
   PAGE_LIMIT = 100,
   PAGE_MAX_LIMIT = 10000,
   FEATURED_ITEM_SET = 4322,

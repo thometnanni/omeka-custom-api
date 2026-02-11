@@ -2,7 +2,7 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
 import { flushCache, ttlCache } from "./redis.js";
-import { ORIGIN, API_PORT, NEWSLETTER_TYPE_ID } from "./env.js";
+import { ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
   getFeatured,
@@ -147,7 +147,7 @@ async function preloadCounts(force = false) {
 
 try {
   await preload();
-  await server.listen({ port: API_PORT });
+  await server.listen({ host: API_HOST, port: API_PORT });
 } catch (err) {
   server.log.error(err);
   process.exit(1);
