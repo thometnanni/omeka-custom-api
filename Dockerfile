@@ -26,4 +26,4 @@ COPY --from=builder /app .
 EXPOSE 3000
 
 # Default command – you can replace with pm2‑runtime if you still want pm2 inside
-CMD ["node", "src/index.js"]
+CMD ["node", "index.js"]
