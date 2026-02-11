@@ -13,7 +13,7 @@ services:
 
 cua_redis:
   image: redis:8.6-alpine # official lightweight Redis image
-  container_name: cua_redia
+  container_name: cua_redis
   restart: unless-stopped
   # Persist data between container restarts
   volumes:
