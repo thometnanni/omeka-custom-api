@@ -2,7 +2,7 @@ services:
   cua_api:
     build: .
     container_name: cua_api
-    restart: unless-stopped
+    restart: always
     env_file: .env
     ports:
       - "8001:3000"
@@ -12,7 +12,7 @@ services:
   cua_redis:
     image: redis:8.6-alpine # official lightweight Redis image
     container_name: cua_redis
-    restart: unless-stopped
+    restart: always
     # Persist data between container restarts
     volumes:
       - redis-data:/data
