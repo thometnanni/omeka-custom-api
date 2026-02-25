@@ -152,7 +152,7 @@ export async function getCreators(force = false) {
 
 export async function getCounts(force = false) {
   const cached = await getCache("counts");
-  // if (cached && !force) return cached;
+  if (cached && !force) return cached;
 
   const allItems = await getAllItems();
   const allItemsButIssues = allItems.filter(
