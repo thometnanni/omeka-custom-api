@@ -213,7 +213,10 @@ export function resolveLinkedProperties(item, filters) {
             id,
           };
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter(
+          ({ id }, i, props) => props.findIndex((p) => p.id === id) === i,
+        );
       return [name, values];
     }),
   );
