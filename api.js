@@ -117,20 +117,13 @@ export async function getFilters(force = false) {
 
   const allItems = await getAllItems();
   const allItemsButIssues = allItems.filter(
-    ({ "curation:category": categories }) => {
-      return (
-        categories == null ||
-        !categories.map(({ value_resource_id: id }) => id).includes(4561)
-      );
-    },
+    ({ "dcterms:isPartOf": isPartOf }) => !isPartOf,
   );
 
   const filters = {
     year: await getFilterYears(allItemsButIssues),
     creator: await getFilterByType("creator", allItemsButIssues),
-    objectType: (await getFilterByType("objectType", allItems)).map((filter) =>
-      filter.id === 4561 ? { ...filter, count: 0 } : filter,
-    ),
+    objectType: await getFilterByType("objectType", allItemsButIssues),
     theme: await getFilterByType("theme", allItemsButIssues),
     era: await getFilterByType("era", allItemsButIssues),
   };
@@ -156,12 +149,7 @@ export async function getCounts(force = false) {
 
   const allItems = await getAllItems();
   const allItemsButIssues = allItems.filter(
-    ({ "curation:category": categories }) => {
-      return (
-        categories == null ||
-        !categories.map(({ value_resource_id: id }) => id).includes(4561)
-      );
-    },
+    ({ "dcterms:isPartOf": isPartOf }) => !isPartOf,
   );
 
   const types = allItemsButIssues.map(normalizeType);
