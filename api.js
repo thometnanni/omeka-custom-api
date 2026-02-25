@@ -287,8 +287,12 @@ export async function queryItems(
     items.push(...retrieveCreators(items, creators, id));
   }
 
+  const ignoreParts = id == null && query.search == null;
+
   const creators = items.filter(({ type }) => type === "creator");
-  const objects = items.filter(({ type }) => type === "object");
+  const objects = items
+    .filter(({ type }) => type === "object")
+    .filter(({ isPart }) => !ignoreParts || !isPart);
 
   const counts = {
     creators: creators.length,

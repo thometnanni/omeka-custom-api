@@ -17,7 +17,7 @@ export function normalizeValue(property) {
       property.map(({ "@language": language, "@value": value }) => [
         language,
         safeTrim(value),
-      ])
+      ]),
     );
   }
 
@@ -50,11 +50,11 @@ export function normalizeType(item) {
   const term = [item["@type"]]?.flat()?.find((type) =>
     Object.values(types)
       .map(({ term }) => term)
-      .includes(type)
+      .includes(type),
   );
 
   const type = Object.entries(types).find(
-    ([, type]) => type.term === term
+    ([, type]) => type.term === term,
   )?.[0];
 
   return type ?? "object";
@@ -82,7 +82,7 @@ export function normalizeMedia(items) {
           url: overwriteFileUrl(url),
           type,
           title: normalizeValue(title) ?? filename.replace(/^.+\//, ""),
-        })
+        }),
     );
 
   if (mediaItems.length === 0) return null;
@@ -113,7 +113,7 @@ export function normalizeHtml(items) {
 export function normalizeOmekaFields(
   item,
   filters,
-  include = { text: false, description: false, heroes: false, items: false }
+  include = { text: false, description: false, heroes: false, items: false },
 ) {
   return omitNullish({
     id: item["o:id"],
@@ -131,6 +131,7 @@ export function normalizeOmekaFields(
         overwriteFileUrl(item.thumbnail_display_urls?.large),
       ],
     items: include.items && normalizeReverseItems(item["@reverse"]),
+    isPart: item["dcterms:isPartOf"] != null || null,
     ...resolveLinkedProperties(item, filters),
   });
 }
@@ -147,7 +148,7 @@ export function normalizeHero(item) {
 
 export function normalizeItemFilters(items) {
   const itemFilters = Object.fromEntries(
-    Object.keys(filterConfig).map((key) => [key, {}])
+    Object.keys(filterConfig).map((key) => [key, {}]),
   );
 
   items.forEach((item) => {
@@ -214,7 +215,7 @@ export function resolveLinkedProperties(item, filters) {
         })
         .filter(Boolean);
       return [name, values];
-    })
+    }),
   );
 }
 
