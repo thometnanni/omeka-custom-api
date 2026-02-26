@@ -23,6 +23,8 @@ export function normalizeValue(property) {
 
   if (Array.isArray(property)) property = property[0];
 
+  if (property?.type === "numeric:integer") property = +property["@value"];
+
   return safeTrim(property?.["@value"] ?? property);
 }
 
@@ -132,6 +134,7 @@ export function normalizeOmekaFields(
       ],
     items: include.items && normalizeReverseItems(item["@reverse"]),
     isPart: item["dcterms:isPartOf"] != null || null,
+    number: normalizeValue(item["curation:number"]),
     ...resolveLinkedProperties(item, filters),
   });
 }

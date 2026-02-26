@@ -306,8 +306,15 @@ export async function queryItems(
     },
   );
 
+  const sortedObjects = objects.toSorted((a, b) => {
+    if (a.number != null && b.number != null) return a.number - b.number;
+    if (a.number != null && b.number == null) return 1;
+    if (a.number == null && b.number != null) return -1;
+    return 0;
+  });
+
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
-    items: [...objects, ...sortedCreators],
+    items: [...sortedObjects, ...sortedCreators],
     filters: queryFilters,
     hasNextPage,
     counts,
