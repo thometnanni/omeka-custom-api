@@ -196,7 +196,7 @@ export async function getHeroes() {
 // ITEMS
 export async function getItem(id) {
   const cached = await getCache(`item:${id}`);
-  // if (cached) return cached;
+  if (cached) return cached;
 
   const filters = await getFilters();
   const res = await fetch(`${OMEKA_API}/items/${id}`);
