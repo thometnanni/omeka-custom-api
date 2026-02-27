@@ -128,9 +128,10 @@ export function normalizeOmekaFields(
     text: include.text && normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
     thumbnail: overwriteFileUrl(item.thumbnail_display_urls?.medium),
+    thumbnailLarge: overwriteFileUrl(item.thumbnail_display_urls?.large),
     heroes: include.heroes &&
-      item.thumbnail_display_urls?.large && [
-        overwriteFileUrl(item.thumbnail_display_urls?.large),
+      item.thumbnail_display_urls?.medium && [
+        overwriteFileUrl(item.thumbnail_display_urls?.medium),
       ],
     items: include.items && normalizeReverseItems(item["@reverse"]),
     isPart: item["dcterms:isPartOf"] != null || null,
