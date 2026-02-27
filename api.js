@@ -25,7 +25,10 @@ import { localizeObject } from "./utils/helper.js";
 
 const collators = {
   en: new Intl.Collator("en", { sensitivity: "base", numeric: true }),
-  zh: new Intl.Collator("zh-Hans-u-co-pinyin", { sensitivity: "base" }),
+  zh: new Intl.Collator("zh-Hans-u-co-pinyin", {
+    sensitivity: "base",
+    numeric: true,
+  }),
 };
 
 let awaitingAllItems = false;
@@ -301,17 +304,21 @@ export async function queryItems(
       const localA = localizeObject(a.title, lang);
       const localB = localizeObject(b.title, lang);
 
-      // collators[lang].compare(localA, localB)
       return collators[lang].compare(localA, localB);
     },
   );
 
-  const sortedObjects = objects.toSorted((a, b) => {
-    if (a.number != null && b.number != null) return a.number - b.number;
-    if (a.number != null && b.number == null) return 1;
-    if (a.number == null && b.number != null) return -1;
-    return 0;
-  });
+  const sortObjects = id != null;
+
+  const sortedObjects =
+    (sortObjects &&
+      objects.toSorted((a, b) => {
+        const localA = localizeObject(a.title, lang);
+        const localB = localizeObject(b.title, lang);
+
+        return collators[lang].compare(localA, localB);
+      })) ||
+    objects;
 
   return await setCache(`query:${queryString}`, 60 * 60 * 12, {
     items: [...sortedObjects, ...sortedCreators],
