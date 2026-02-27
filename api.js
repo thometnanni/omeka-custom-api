@@ -33,9 +33,9 @@ const collators = {
 
 let awaitingAllItems = false;
 
-export async function getAllItems() {
+export async function getAllItems(force) {
   const cached = await getCache("allItems");
-  if (cached) return cached;
+  if (cached && !force) return cached;
   if (awaitingAllItems) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     return await getAllItems();
@@ -377,4 +377,18 @@ export async function getPage(slug, lang) {
     };
 
   return await setCache(`page:${localSlug}`, 60 * 60 * 24, page);
+}
+
+export async function getLastModified() {
+  const url = `${OMEKA_API}/items?sort_by=modified&sort_order=desc&per_page=20&page=1`;
+
+  const res = await fetch(url);
+  if (!res.ok) return { error: res };
+
+  const json = await res.json();
+  console.log(
+    json.map(
+      ({ "o:modified": modified }) => new Date(normalizeValue(modified)),
+    ),
+  );
 }
