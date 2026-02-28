@@ -397,7 +397,8 @@ export async function getLastModified(ms, limit = 20) {
 
   await Promise.all(
     modifiedItems.map(async ({ "o:id": id }) => {
-      return await delCache(`item:details:${id}`);
+      await delCache(`item:details:${id}`);
+      return await delCache(`item:${id}`);
     }),
   );
 
