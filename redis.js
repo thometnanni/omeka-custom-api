@@ -28,3 +28,7 @@ export async function flushCache() {
 export async function ttlCache(key) {
   return await redisClient.ttl(key);
 }
+
+export async function delCache(key) {
+  await redisClient.del(key);
+}

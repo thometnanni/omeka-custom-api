@@ -19,7 +19,7 @@ import {
   OMEKA_SITE,
   PAGE_LIMIT,
 } from "./env.js";
-import { getCache, setCache } from "./redis.js";
+import { delCache, getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
 import { localizeObject } from "./utils/helper.js";
 
@@ -33,9 +33,9 @@ const collators = {
 
 let awaitingAllItems = false;
 
-export async function getAllItems() {
+export async function getAllItems(force) {
   const cached = await getCache("allItems");
-  if (cached) return cached;
+  if (cached && !force) return cached;
   if (awaitingAllItems) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     return await getAllItems();
@@ -251,6 +251,7 @@ export async function queryItems(
   if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
+
   const res = await fetch(url);
 
   if (!res.ok) return { error: res };
@@ -377,4 +378,36 @@ export async function getPage(slug, lang) {
     };
 
   return await setCache(`page:${localSlug}`, 60 * 60 * 24, page);
+}
+
+export async function getLastModified(ms, limit = 20) {
+  const url = `${OMEKA_API}/items?sort_by=modified&sort_order=desc&per_page=${limit}&page=1`;
+
+  const res = await fetch(url);
+  if (!res.ok) return { error: res };
+
+  const items = await res.json();
+
+  const currentTime = new Date().getTime();
+
+  const modifiedItems = items.filter(({ "o:modified": modified }) => {
+    const itemTime = new Date(normalizeValue(modified)).getTime();
+    return currentTime - itemTime < ms;
+  });
+
+  await Promise.all(
+    modifiedItems.map(async ({ "o:id": id }) => {
+      await delCache(`item:details:${id}`);
+      return await delCache(`item:${id}`);
+    }),
+  );
+
+  return modifiedItems;
+}
+
+export async function flush() {
+  const items = await getAllItems(true);
+  await flushCache();
+  await setCache("allItems", 60 * 60, items);
+  await preload();
 }

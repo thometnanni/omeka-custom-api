@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
-import { flushCache, ttlCache } from "./redis.js";
+import { delCache, ttlCache } from "./redis.js";
 import { ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
@@ -14,6 +14,8 @@ import {
   getPage,
   getCreators,
   getCounts,
+  getLastModified,
+  flush,
 } from "./api.js";
 // ---
 // SETUP
@@ -30,8 +32,7 @@ await server.register(cors, {
 // ---
 // FLUSH
 server.all("/flush", async () => {
-  await flushCache();
-  preload();
+  await flush();
   return { status: "Cache flushed" };
 });
 
@@ -114,6 +115,27 @@ server.get("/page/:slug", async (req, reply) => {
 });
 
 // ---
+// UPDATES
+// ---
+
+async function update() {
+  const ms = 1000 * 60 * 1;
+  const itemLimit = 20;
+
+  const modifiedItems = await getLastModified(ms, itemLimit);
+
+  if (itemLimit === modifiedItems.length) {
+    flush();
+  }
+
+  if (modifiedItems.length > 0) {
+    delCache(`query:per_page=100&page=1`);
+  }
+
+  setTimeout(preloadFilters, ms, true);
+}
+
+// ---
 // PRELOAD
 // ---
 
@@ -148,6 +170,7 @@ async function preloadCounts(force = false) {
 try {
   await preload();
   await server.listen({ host: API_HOST, port: API_PORT });
+  await update();
 } catch (err) {
   server.log.error(err);
   process.exit(1);
