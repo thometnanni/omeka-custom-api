@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
-import { delCache, ttlCache } from "./redis.js";
+import { delCache, flushCache, ttlCache } from "./redis.js";
 import { ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
@@ -15,7 +15,6 @@ import {
   getCreators,
   getCounts,
   getLastModified,
-  flush,
 } from "./api.js";
 // ---
 // SETUP
@@ -133,6 +132,13 @@ async function update() {
   }
 
   setTimeout(preloadFilters, ms, true);
+}
+
+export async function flush() {
+  const items = await getAllItems(true);
+  await flushCache();
+  await setCache("allItems", 60 * 60, items);
+  await preload();
 }
 
 // ---
