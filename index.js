@@ -48,7 +48,7 @@ server.get("/featured", async (req, reply) => {
   const newItems = await queryItems(
     null,
     { limit: 50 },
-    { retrieveCreators: false },
+    { retrieveCreators: false, ttl: 60 * 11 },
   );
   if (newItems.error) return reply.send(newItems.error);
 
@@ -58,7 +58,7 @@ server.get("/featured", async (req, reply) => {
       limit: 20,
       objectType: NEWSLETTER_TYPE_ID,
     },
-    { retrieveCreators: false },
+    { retrieveCreators: false, ttl: 60 * 13 },
   );
   if (newsletters.error) return reply.send(newsletters.error);
 
