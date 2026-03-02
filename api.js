@@ -247,7 +247,12 @@ export async function queryItems(
   }
 
   const { queryString, isFiltered, limit } = parseQuery(query);
-  const cached = await getCache(`query:${queryString}`);
+
+  const sortObjects = id != null;
+  const lang = query.lang ?? "en";
+  const cached = await getCache(
+    `query:${queryString}${sortObjects ? `:${lang}` : ""}`,
+  );
   if (cached) return cached;
 
   const url = `${OMEKA_API}/items?sort_by=created&sort_order=desc&${queryString}`;
@@ -299,7 +304,6 @@ export async function queryItems(
 
   const queryFilters = isFiltered ? normalizeItemFilters(items) : null;
 
-  const lang = query.lang ?? "en";
   const sortedCreators = (options.removeCreators ? [] : creators).toSorted(
     (a, b) => {
       const localA = localizeObject(a.title, lang);
@@ -308,8 +312,6 @@ export async function queryItems(
       return collators[lang].compare(localA, localB);
     },
   );
-
-  const sortObjects = id != null;
 
   const sortedObjects =
     (sortObjects &&
@@ -321,12 +323,16 @@ export async function queryItems(
       })) ||
     objects;
 
-  return await setCache(`query:${queryString}`, options.ttl ?? 60 * 60 * 6, {
-    items: [...sortedObjects, ...sortedCreators],
-    filters: queryFilters,
-    hasNextPage,
-    counts,
-  });
+  return await setCache(
+    `query:${queryString}${sortObjects ? `:${lang}` : ""}`,
+    options.ttl ?? 60 * 60 * 6,
+    {
+      items: [...sortedObjects, ...sortedCreators],
+      filters: queryFilters,
+      hasNextPage,
+      counts,
+    },
+  );
 }
 
 export async function queryCreators(query = {}) {
