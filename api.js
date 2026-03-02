@@ -19,7 +19,7 @@ import {
   OMEKA_SITE,
   PAGE_LIMIT,
 } from "./env.js";
-import { delCache, flushCache, getCache, setCache } from "./redis.js";
+import { delCache, getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
 import { localizeObject } from "./utils/helper.js";
 
@@ -403,11 +403,4 @@ export async function getLastModified(ms, limit = 20) {
   );
 
   return modifiedItems;
-}
-
-export async function flush() {
-  const items = await getAllItems(true);
-  await flushCache();
-  await setCache("allItems", 60 * 60, items);
-  await preload();
 }
