@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
-import { delCache, flushCache, ttlCache } from "./redis.js";
+import { delCache, flushCache, setCache, ttlCache } from "./redis.js";
 import { ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
@@ -15,6 +15,7 @@ import {
   getCreators,
   getCounts,
   getLastModified,
+  getAllItems,
 } from "./api.js";
 // ---
 // SETUP
