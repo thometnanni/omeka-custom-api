@@ -19,7 +19,7 @@ import {
   OMEKA_SITE,
   PAGE_LIMIT,
 } from "./env.js";
-import { delCache, getCache, setCache } from "./redis.js";
+import { delCache, flushCache, getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
 import { localizeObject } from "./utils/helper.js";
 
