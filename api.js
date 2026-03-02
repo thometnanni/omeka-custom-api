@@ -238,7 +238,7 @@ export async function getItemDetails(id) {
 export async function queryItems(
   id,
   query = {},
-  options = { retrieveCreators: true, removeCreators: false, ttl: 60 * 60 * 6 },
+  options = { retrieveCreators: true, removeCreators: false, ttl },
 ) {
   if (id != null) {
     const item = await getItem(id);
@@ -321,7 +321,7 @@ export async function queryItems(
       })) ||
     objects;
 
-  return await setCache(`query:${queryString}`, ttl, {
+  return await setCache(`query:${queryString}`, options.ttl ?? 60 * 60 * 6, {
     items: [...sortedObjects, ...sortedCreators],
     filters: queryFilters,
     hasNextPage,
