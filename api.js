@@ -178,7 +178,7 @@ export async function getFeatured() {
   const json = await res.json();
   const featured = json.map((item) => normalizeOmekaFields(item, filters));
 
-  return await setCache("featured", 60 * 60 * 24, featured);
+  return await setCache("featured", 60 * 17, featured);
 }
 
 export async function getHeroes() {
@@ -238,7 +238,7 @@ export async function getItemDetails(id) {
 export async function queryItems(
   id,
   query = {},
-  options = { retrieveCreators: true, removeCreators: false },
+  options = { retrieveCreators: true, removeCreators: false, ttl: 60 * 60 * 6 },
 ) {
   if (id != null) {
     const item = await getItem(id);
@@ -321,7 +321,7 @@ export async function queryItems(
       })) ||
     objects;
 
-  return await setCache(`query:${queryString}`, 60 * 60 * 12, {
+  return await setCache(`query:${queryString}`, ttl, {
     items: [...sortedObjects, ...sortedCreators],
     filters: queryFilters,
     hasNextPage,
