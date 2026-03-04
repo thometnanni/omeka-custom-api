@@ -248,7 +248,7 @@ export async function queryItems(
 
   const { queryString, isFiltered, limit } = parseQuery(query);
 
-  const sortObjects = id != null;
+  const sortObjects = id != null || query.search != null;
   const lang = query.lang ?? "en";
   const cached = await getCache(
     `query:${queryString}${sortObjects ? `:${lang}` : ""}`,
