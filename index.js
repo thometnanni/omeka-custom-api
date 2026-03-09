@@ -16,6 +16,7 @@ import {
   getCounts,
   getLastModified,
   getAllItems,
+  getIds,
 } from "./api.js";
 // ---
 // SETUP
@@ -114,6 +115,12 @@ server.get("/page/:slug", async (req, reply) => {
   return res;
 });
 
+server.get("/ids", async (req, reply) => {
+  const res = await getIds(req.params.id);
+  if (res.error) return reply.send(res.error);
+  return localizeObject(res, req.query.lang);
+});
+
 // ---
 // UPDATES
 // ---
@@ -131,8 +138,6 @@ async function update() {
   if (modifiedItems.length > 0) {
     delCache(`query:per_page=100&page=1`);
   }
-
-  setTimeout(preloadFilters, ms, true);
 }
 
 export async function flush() {
@@ -150,6 +155,7 @@ async function preload() {
   preloadFilters();
   preloadCreators();
   preloadCounts();
+  preloadIds();
 }
 
 async function preloadFilters(force = false) {
@@ -168,6 +174,12 @@ async function preloadCounts(force = false) {
   await getCounts(force);
   const ttl = await ttlCache("counts");
   setTimeout(preloadCounts, ttl * 0.95, true);
+}
+
+async function preloadIds(force = false) {
+  await getIds(force);
+  const ttl = await ttlCache("ids");
+  setTimeout(preloadIds, ttl * 0.95, true);
 }
 
 // ---
