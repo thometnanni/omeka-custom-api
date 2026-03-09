@@ -410,3 +410,17 @@ export async function getLastModified(ms, limit = 20) {
 
   return modifiedItems;
 }
+
+export async function getIds(force) {
+  const cached = await getCache("ids");
+  if (cached && !force) return cached;
+
+  const allItems = await getAllItems();
+  const ids = Object.fromEntries(
+    allItems.map(({ "o:id": id, "o:modified": modified }) => [
+      id,
+      modified["@value"].split("T")[0],
+    ]),
+  );
+  return await setCache("ids", 60 * 60 * 24 * 7, ids);
+}
