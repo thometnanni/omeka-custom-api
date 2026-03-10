@@ -50,7 +50,8 @@ jobs:
             set -e               # abort on any error
             cd /srv/api
             git pull
-            podman compose down
-            podman compose up --build -d
-            podman image prune -a -f
+            podman compose down --remove-orphans
+            podman compose up -d
+            podman container prune -f   # remove stopped containers first
+            podman image prune -a -f    # now images are free to be removed
           EOF
