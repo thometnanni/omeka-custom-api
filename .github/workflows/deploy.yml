@@ -53,5 +53,5 @@ jobs:
             podman compose down --remove-orphans
             podman compose up -d
             podman container prune -f   # remove stopped containers first
-            podman image prune -a -f    # now images are free to be removed
+            podman image prune -f    # now images are free to be removed
           EOF
