@@ -52,4 +52,5 @@ jobs:
             git pull
             podman compose down
             podman compose up --build -d
+            podman image prune -a -f
           EOF
