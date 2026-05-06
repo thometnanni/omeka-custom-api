@@ -1,8 +1,9 @@
+import { createReadStream, existsSync } from "fs";
 import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
 import { delCache, flushCache, setCache, ttlCache } from "./redis.js";
-import { ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
+import { EXPORT_PATH, ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
 import {
   getFilters,
   getFeatured,
@@ -119,6 +120,16 @@ server.get("/ids", async (req, reply) => {
   const res = await getIds(req.params.id);
   if (res.error) return reply.send(res.error);
   return localizeObject(res, req.query.lang);
+});
+
+server.get("/export", async (req, reply) => {
+  if (!existsSync(EXPORT_PATH)) {
+    return reply.status(503).send({ error: "Export not yet available" });
+  }
+  return reply
+    .header("Content-Disposition", 'attachment; filename="export.json"')
+    .type("application/json")
+    .send(createReadStream(EXPORT_PATH));
 });
 
 // ---
