@@ -51,7 +51,7 @@ jobs:
             cd /srv/api
             git pull
             podman compose down --remove-orphans
-            podman compose up -d
+            podman compose up --build -d
             podman container prune -f   # remove stopped containers first
             podman image prune -f    # now images are free to be removed
           EOF
