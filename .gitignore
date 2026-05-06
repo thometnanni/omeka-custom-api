@@ -11,3 +11,7 @@ Thumbs.db
 
 # Redis
 dump.rdb
+
+# export
+
+export.json

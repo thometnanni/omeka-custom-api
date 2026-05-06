@@ -1,3 +1,4 @@
+import { writeFile } from "fs/promises";
 import { types } from "./types.js";
 import {
   normalizeValue,
@@ -13,6 +14,7 @@ import {
 import { parseQuery } from "./utils/query.js";
 import { extractSnippets } from "./utils/snippets.js";
 import {
+  EXPORT_PATH,
   FEATURED_ITEM_SET,
   HEROES_ITEM_SET,
   OMEKA_API,
@@ -64,7 +66,11 @@ export async function getAllItems(force) {
 
   awaitingAllItems = false;
   clearTimeout(timeout);
-  return await setCache("allItems", 60 * 60, allItems);
+  const result = await setCache("allItems", 60 * 60, allItems);
+  writeFile(EXPORT_PATH, JSON.stringify(allItems)).catch((err) =>
+    console.error("Failed to write export file:", err),
+  );
+  return result;
 }
 
 // FILTER: YEARS
