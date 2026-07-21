@@ -16,4 +16,5 @@ export const {
   OMEKA_FILE_URL_REPLACEMENT = "", // = "https://cua-files.git-87a.workers.dev",
   OMEKA_FILE_URL = "", // = "https://minjian-danganguan.org/files",
   EXPORT_PATH = "./export.json",
+  FLUSH_SECRET = "",
 } = process.env;
