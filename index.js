@@ -3,7 +3,14 @@ import cors from "@fastify/cors";
 import fastify from "fastify";
 import { parseOrigin, localizeObject } from "./utils/helper.js";
 import { delCache, flushCache, setCache, ttlCache } from "./redis.js";
-import { EXPORT_PATH, ORIGIN, API_PORT, API_HOST, NEWSLETTER_TYPE_ID } from "./env.js";
+import {
+  EXPORT_PATH,
+  ORIGIN,
+  API_PORT,
+  API_HOST,
+  NEWSLETTER_TYPE_ID,
+  FLUSH_SECRET,
+} from "./env.js";
 import {
   getFilters,
   getFeatured,
@@ -33,7 +40,10 @@ await server.register(cors, {
 // ROUTES
 // ---
 // FLUSH
-server.all("/flush", async () => {
+server.all("/flush", async (req, reply) => {
+  if (!FLUSH_SECRET || req.headers["x-flush-secret"] !== FLUSH_SECRET) {
+    return reply.status(401).send({ error: "Unauthorized" });
+  }
   await flush();
   return { status: "Cache flushed" };
 });
@@ -162,7 +172,22 @@ export async function flush() {
 // PRELOAD
 // ---
 
+// Holds the active setTimeout handle for each recurring preload loop, so that
+// re-running preload() (e.g. from flush()) cancels the previous chain instead
+// of stacking a new one on top of it forever.
+const preloadTimers = {
+  filters: null,
+  creators: null,
+  counts: null,
+  ids: null,
+};
+
 async function preload() {
+  clearTimeout(preloadTimers.filters);
+  clearTimeout(preloadTimers.creators);
+  clearTimeout(preloadTimers.counts);
+  clearTimeout(preloadTimers.ids);
+
   preloadFilters();
   preloadCreators();
   preloadCounts();
@@ -172,25 +197,25 @@ async function preload() {
 async function preloadFilters(force = false) {
   await getFilters(force);
   const ttl = await ttlCache("filters");
-  setTimeout(preloadFilters, ttl * 0.95, true);
+  preloadTimers.filters = setTimeout(preloadFilters, ttl * 0.95, true);
 }
 
 async function preloadCreators(force = false) {
   await getCreators(force);
   const ttl = await ttlCache("creators");
-  setTimeout(preloadCreators, ttl * 0.95, true);
+  preloadTimers.creators = setTimeout(preloadCreators, ttl * 0.95, true);
 }
 
 async function preloadCounts(force = false) {
   await getCounts(force);
   const ttl = await ttlCache("counts");
-  setTimeout(preloadCounts, ttl * 0.95, true);
+  preloadTimers.counts = setTimeout(preloadCounts, ttl * 0.95, true);
 }
 
 async function preloadIds(force = false) {
   await getIds(force);
   const ttl = await ttlCache("ids");
-  setTimeout(preloadIds, ttl * 0.95, true);
+  preloadTimers.ids = setTimeout(preloadIds, ttl * 0.95, true);
 }
 
 // ---
