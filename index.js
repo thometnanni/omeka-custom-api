@@ -146,8 +146,23 @@ server.get("/export", async (req, reply) => {
 // UPDATES
 // ---
 
+const UPDATE_INTERVAL = 1000 * 60 * 1;
+let updateTimer = null;
+
+function scheduleUpdate() {
+  clearTimeout(updateTimer);
+  updateTimer = setTimeout(async () => {
+    try {
+      await update();
+    } catch (err) {
+      server.log.error(err);
+    }
+    scheduleUpdate();
+  }, UPDATE_INTERVAL);
+}
+
 async function update() {
-  const ms = 1000 * 60 * 1;
+  const ms = UPDATE_INTERVAL;
   const itemLimit = 20;
 
   const modifiedItems = await getLastModified(ms, itemLimit);
@@ -226,6 +241,7 @@ try {
   await preload();
   await server.listen({ host: API_HOST, port: API_PORT });
   await update();
+  scheduleUpdate();
 } catch (err) {
   server.log.error(err);
   process.exit(1);
