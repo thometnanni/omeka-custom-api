@@ -24,14 +24,8 @@ import {
 import { delCache, getCache, setCache } from "./redis.js";
 import { retrieveCreators } from "./utils/retrieve.js";
 import { localizeObject } from "./utils/helper.js";
+import { COLLATORS, normalizeLang } from "./utils/languages.js";
 
-const collators = {
-  en: new Intl.Collator("en", { sensitivity: "base", numeric: true }),
-  zh: new Intl.Collator("zh-Hans-u-co-pinyin", {
-    sensitivity: "base",
-    numeric: true,
-  }),
-};
 
 let awaitingAllItems = false;
 
@@ -255,7 +249,7 @@ export async function queryItems(
   const { queryString, isFiltered, limit } = parseQuery(query);
 
   const sortObjects = id != null || query.search != null;
-  const lang = query.lang ?? "en";
+  const lang = normalizeLang(query.lang);
   const cached = await getCache(
     `query:${queryString}${sortObjects ? `:${lang}` : ""}`,
   );
@@ -315,7 +309,7 @@ export async function queryItems(
       const localA = localizeObject(a.title, lang);
       const localB = localizeObject(b.title, lang);
 
-      return collators[lang].compare(localA, localB);
+      return COLLATORS[lang].compare(localA, localB);
     },
   );
 
@@ -325,7 +319,7 @@ export async function queryItems(
         const localA = localizeObject(a.title, lang);
         const localB = localizeObject(b.title, lang);
 
-        return collators[lang].compare(localA, localB);
+        return COLLATORS[lang].compare(localA, localB);
       })) ||
     objects;
 
@@ -350,12 +344,12 @@ export async function queryCreators(query = {}) {
     ...totalCounts,
   };
 
-  const lang = query.lang ?? "en";
+  const lang = normalizeLang(query.lang);
   const items = creators.toSorted((a, b) => {
     const localA = localizeObject(a.title, lang);
     const localB = localizeObject(b.title, lang);
 
-    return collators[lang].compare(localA, localB);
+    return COLLATORS[lang].compare(localA, localB);
   });
 
   return {
@@ -367,7 +361,7 @@ export async function queryCreators(query = {}) {
 }
 
 export async function getPage(slug, lang) {
-  const localSlug = `${slug}-${lang}`;
+  const localSlug = `${slug}-${normalizeLang(lang)}`;
 
   const cached = await getCache(`page:${localSlug}`);
   if (cached) return cached;
