@@ -1,3 +1,10 @@
+import {
+  DEFAULT_LANGUAGE,
+  FALLBACKS,
+  SUPPORTED_LANGUAGES,
+  normalizeLang,
+} from "./languages.js";
+
 /**
  * Convert an origin string (comma-separated or slash-delimited regexes) into RegExp objects.
  * Example inputs: "https://a.example, /https:\\/\\/.*\\.example/"
@@ -14,7 +21,8 @@ export function parseOrigin(origin) {
 }
 /**
  * Recursively localize an object to a preferred language code.
- * - If obj is a language-keyed map (all keys length 2) return obj[lang] or a fallback.
+ * - If obj is a language-keyed map (every key is a supported language) return
+ *   the value for lang, then its FALLBACKS, then the default language.
  * - Otherwise traverse the object/array and localize nested values.
  * @param {*} obj
  * @param {string|null} lang
@@ -27,8 +35,9 @@ export function localizeObject(obj, lang) {
     return obj;
   }
 
-  if (Object.keys(obj).every((key) => key.length === 2)) {
-    return obj[lang] || obj[Object.keys(obj)[0]] || obj;
+  const keys = Object.keys(obj);
+  if (keys.length > 0 && keys.every(isLanguageKey)) {
+    return pickLanguage(obj, normalizeLang(lang)) || obj;
   }
 
   return Object.entries(obj).reduce(
@@ -38,6 +47,21 @@ export function localizeObject(obj, lang) {
     },
     Array.isArray(obj) ? [] : {}
   );
+}
+
+function isLanguageKey(key) {
+  return SUPPORTED_LANGUAGES.includes(key.toLowerCase());
+}
+
+function pickLanguage(obj, lang) {
+  const byCode = Object.fromEntries(
+    Object.entries(obj).map(([key, value]) => [key.toLowerCase(), value])
+  );
+
+  const candidates = [lang, ...FALLBACKS[lang], DEFAULT_LANGUAGE];
+  const match = candidates.find((code) => byCode[code]);
+
+  return match ? byCode[match] : Object.values(obj).find(Boolean);
 }
 /**
  * Return a new object that contains only the entries whose value is
