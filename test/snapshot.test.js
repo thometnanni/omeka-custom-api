@@ -50,7 +50,7 @@ test("reverse index matches linking items", () => {
 test("linked properties are resolved with current titles", () => {
   const { item } = snapshot.records.get(41);
   assert.deepEqual(item.creator, [
-    { id: CREATOR_A, title: { en: "Alice Zhang", zh: "张爱丽" } },
+    { id: CREATOR_A, title: { en: "Alice Zhang", zh: "张爱丽", "zh-hk": "張愛麗" } },
     { id: CREATOR_B, title: "Bob Wang" },
   ]);
 

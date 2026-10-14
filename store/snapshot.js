@@ -1,6 +1,7 @@
 import { types } from "../types.js";
 import { FEATURED_ITEM_SET, HEROES_ITEM_SET } from "../env.js";
 import {
+  convertedLanguages,
   linkedIds,
   normalizeHero,
   normalizeOmekaFields,
@@ -11,6 +12,7 @@ import {
 import { localizeObject } from "../utils/helper.js";
 import { COLLATORS, SUPPORTED_LANGUAGES } from "../utils/languages.js";
 import { fold } from "../query/search.js";
+import { convertTo, hasHan } from "../utils/chinese.js";
 
 // properties that get their own search field (or none at all)
 const SEARCH_FIELDS = {
@@ -57,9 +59,12 @@ function prepareItem(raw) {
   // descriptions and extracted texts are folded once and reused for snippets
   const foldTexts = (property) =>
     (raw[property] ?? [])
-      .map((value) => value?.["@value"])
-      .filter((text) => typeof text === "string" && text.trim().length > 0)
-      .map((text) => ({ text: text.trim(), folded: fold(text.trim()) }));
+      .filter(({ "@value": text }) => typeof text === "string" && text.trim().length > 0)
+      .map(({ "@value": text, "@language": lang }) => ({
+        text: text.trim(),
+        folded: fold(text.trim()),
+        lang,
+      }));
   const descriptions = foldTexts("dcterms:description");
   const texts = foldTexts("extracttext:extracted_text");
   search.description = descriptions.map(({ folded }) => folded);
@@ -88,6 +93,14 @@ function prepareItem(raw) {
     refs: [...refs],
     itemSets: (raw["o:item_set"] ?? []).map((set) => set["o:id"]),
     title: normalizeValue(raw["dcterms:title"]),
+    // languages of title, alternative title and description that are converted
+    // from the other Chinese script, e.g. { "zh-hk": "zh" }
+    convertedFrom: Object.assign(
+      {},
+      ...["dcterms:title", "dcterms:alternative", "dcterms:description"].map(
+        (property) => convertedLanguages(raw[property]),
+      ),
+    ),
     snippetSources: [...descriptions, ...texts],
     search: Object.fromEntries(
       Object.entries(search).map(([field, values]) => [
@@ -248,14 +261,29 @@ function globalFilters(records) {
 }
 
 /**
- * Index site pages by slug. The first page with a slug wins.
+ * Index site pages by slug. The first page with a slug wins. Pages that only
+ * exist as <slug>-zh or <slug>-zh-hk get the other script converted.
  * @param {Object[]} rawPages
- * @returns {Map<string, {title:string, html:string}>}
+ * @returns {Map<string, {title:string, html:string, convertedFrom?:string}>}
  */
 function buildPages(rawPages) {
   const pages = new Map();
   for (const page of rawPages) {
     if (!pages.has(page["o:slug"])) pages.set(page["o:slug"], normalizePage([page]));
+  }
+
+  const conversions = { "-zh-hk": ["-zh", "zh-hk"], "-zh": ["-zh-hk", "zh"] };
+  for (const [slug, page] of [...pages]) {
+    for (const [suffix, [sourceSuffix, lang]] of Object.entries(conversions)) {
+      if (!slug.endsWith(sourceSuffix) || page.convertedFrom) continue;
+      const target = slug.slice(0, -sourceSuffix.length) + suffix;
+      if (pages.has(target) || !(hasHan(page.title) || hasHan(page.html))) continue;
+      pages.set(target, {
+        title: convertTo(page.title, lang),
+        html: convertTo(page.html, lang),
+        convertedFrom: sourceSuffix.slice(1),
+      });
+    }
   }
   return pages;
 }

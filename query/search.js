@@ -1,3 +1,5 @@
+import { foldScript } from "../utils/chinese.js";
+
 /**
  * Search fields and their weight in the relevance score.
  * The haystacks themselves are built once per item in store/snapshot.js.
@@ -13,16 +15,19 @@ export const SEARCH_WEIGHTS = {
 
 /**
  * Fold a string for matching: compatibility decomposition (full-width →
- * half-width, ligatures), strip diacritics, lowercase.
+ * half-width, ligatures), strip diacritics, lowercase, traditional → simplified
+ * Chinese characters.
  * @param {string} str
  * @returns {string}
  */
 export function fold(str) {
   if (!str) return "";
-  return str
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
+  return foldScript(
+    str
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase(),
+  );
 }
 
 /**
@@ -64,16 +69,26 @@ export function scoreRecord(record, terms) {
 
 /**
  * Extract up to 3 text snippets around matches of the search terms in the
- * description and extracted text of a record.
- * @param {{snippetSources: {text:string, folded:string}[]}} record
+ * description and extracted text of a record. Snippets of tagged texts are
+ * language maps, e.g. { term: { zh: "…" }, snippet: { zh: "…" } }, so
+ * localization keeps them as written for their own language.
+ * @param {{snippetSources: {text:string, folded:string, lang?:string}[]}} record
  * @param {string[]} terms - folded terms
  * @param {number} [max=3]
- * @returns {{term:string, snippet:string}[]}
+ * @returns {{term:string|Object, snippet:string|Object}[]}
  */
 export function extractSnippets(record, terms, max = 3) {
   const snippets = [];
   for (const source of record.snippetSources) {
-    snippets.push(...matchWithContext(source, terms, max - snippets.length));
+    const matches = matchWithContext(source, terms, max - snippets.length);
+    snippets.push(
+      ...(source.lang
+        ? matches.map(({ term, snippet }) => ({
+            term: { [source.lang]: term },
+            snippet: { [source.lang]: snippet },
+          }))
+        : matches),
+    );
     if (snippets.length >= max) break;
   }
   return snippets;
@@ -147,7 +162,7 @@ function originalIndices(text, indices) {
 const foldedLengths = new Map();
 
 function foldedLength(codePoint) {
-  // ASCII and CJK ideographs are unchanged by fold()
+  // ASCII and CJK ideographs keep their length in fold()
   if (codePoint < 0x80 || (codePoint >= 0x4e00 && codePoint <= 0x9fff)) return 1;
   let length = foldedLengths.get(codePoint);
   if (length === undefined) {

@@ -31,10 +31,12 @@ export function rawItem({
   partOf,
   itemSets = [],
 }) {
-  const titles =
-    typeof title === "string"
-      ? [literal(title)]
-      : Object.entries(title).map(([lang, value]) => literal(value, lang));
+  // strings are untagged, objects map languages to values
+  const values = (value) =>
+    typeof value === "string"
+      ? [literal(value)]
+      : Object.entries(value).map(([lang, text]) => literal(text, lang));
+  const titles = values(title);
   return {
     "o:id": id,
     "@type": type ? ["o:Item", type] : "o:Item",
@@ -45,7 +47,7 @@ export function rawItem({
     thumbnail_display_urls: { medium: `https://files/${id}.jpg`, large: `https://files/${id}-l.jpg` },
     "dcterms:title": titles,
     ...(date && { "dcterms:date": [date].flat().map((d) => literal(d)) }),
-    ...(description && { "dcterms:description": [literal(description)] }),
+    ...(description && { "dcterms:description": values(description) }),
     ...(text && { "extracttext:extracted_text": [literal(text)] }),
     ...(creator.length && { "dcterms:creator": creator.map((c) => link(c)) }),
     ...(objectType.length && { "curation:category": objectType.map((c) => link(c)) }),

@@ -1,31 +1,85 @@
 import he from "he";
 import { types } from "../types.js";
 import { omitNullish } from "./helper.js";
+import { convertTo, hasHan } from "./chinese.js";
 import { OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT } from "../env.js";
 
 /**
  * Normalize a value from the API into a language-indexed object or single value
- * - If property is an array with length > 1: returns { langCode: value, ... }
- * - Otherwise returns the first "@value" or the value itself
+ * - tagged values (with "@language") become { langCode: value, ... }, see
+ *   languageValues; a missing zh or zh-hk is converted from the other script
+ * - untagged values return the first "@value" or the value itself
  * @param {*} property
  * @returns {string|Object|*}
  */
 
 export function normalizeValue(property) {
-  if (Array.isArray(property) && property.length > 1) {
-    return Object.fromEntries(
-      property.map(({ "@language": language, "@value": value }) => [
-        language,
-        safeTrim(value),
-      ]),
-    );
-  }
+  const values = languageValues(property);
+  if (values) return completeLanguages(values);
 
   if (Array.isArray(property)) property = property[0];
 
   if (property?.type === "numeric:integer") property = +property["@value"];
 
   return safeTrim(property?.["@value"] ?? property);
+}
+
+/**
+ * Map tagged values by language. If only some values are tagged, untagged
+ * ones count as zh if they contain Chinese characters, otherwise as en,
+ * unless that language is tagged already.
+ * @param {*} property - raw property values
+ * @returns {Object|null} null if no value is tagged
+ */
+function languageValues(property) {
+  if (!Array.isArray(property)) return null;
+  const tagged = property.filter((value) => value?.["@language"]);
+  if (tagged.length === 0) return null;
+
+  const values = Object.fromEntries(
+    tagged.map(({ "@language": language, "@value": value }) => [
+      language,
+      safeTrim(value),
+    ]),
+  );
+  for (const value of property) {
+    if (value?.["@language"] || value?.["@value"] == null) continue;
+    const language = hasHan(value["@value"]) ? "zh" : "en";
+    values[language] ??= safeTrim(value["@value"]);
+  }
+  return values;
+}
+
+// Chinese languages and the language their text is converted from
+const CHINESE_SOURCES = { "zh-hk": "zh", zh: "zh-hk" };
+
+/**
+ * Add the missing Chinese script to a language map.
+ * @param {Object} values - language map
+ * @returns {Object}
+ */
+function completeLanguages(values) {
+  for (const [target, source] of Object.entries(CHINESE_SOURCES)) {
+    if (values[target] == null && values[source] != null) {
+      values[target] = convertTo(values[source], target);
+    }
+  }
+  return values;
+}
+
+/**
+ * Languages whose text normalizeValue converts from the other Chinese script.
+ * Only counts text that contains Chinese characters.
+ * @param {*} property - raw property values
+ * @returns {Object.<string, string>} e.g. { "zh-hk": "zh" }
+ */
+export function convertedLanguages(property) {
+  const values = languageValues(property) ?? {};
+  const result = {};
+  for (const [target, source] of Object.entries(CHINESE_SOURCES)) {
+    if (values[target] == null && hasHan(values[source])) result[target] = source;
+  }
+  return result;
 }
 
 /**
@@ -83,7 +137,8 @@ export function normalizeMedia(items) {
  * - parse language and decode html
  * - normalize return value
  * @param {Object} items
- * @returns {Object}
+ * @returns {{html: Object|string|null, convertedFrom: Object.<string, string>}}
+ *   convertedFrom: see convertedLanguages
  */
 
 export function normalizeHtml(items) {
@@ -94,9 +149,12 @@ export function normalizeHtml(items) {
       return { "@language": lang, "@value": html };
     });
 
-  if (htmlItems.length === 0) return null;
+  if (htmlItems.length === 0) return { html: null, convertedFrom: {} };
 
-  return normalizeValue(htmlItems);
+  return {
+    html: normalizeValue(htmlItems),
+    convertedFrom: convertedLanguages(htmlItems),
+  };
 }
 
 /**

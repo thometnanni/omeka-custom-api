@@ -96,18 +96,30 @@ export function routes(server) {
 
   server.get("/item/:id", { schema: itemParams }, (req, reply) => {
     const snapshot = getSnapshot();
-    if (!snapshot.records.has(req.params.id)) return notFound(reply);
+    const record = snapshot.records.get(req.params.id);
+    if (record == null) return notFound(reply);
     const key = cacheKey(`/item/${req.params.id}`, req.query);
     return sendCached(req, reply, snapshot, key, () =>
-      localizeObject(snapshot.fullItem(req.params.id), req.query.lang),
+      withConvertedFrom(
+        localizeObject(snapshot.fullItem(req.params.id), req.query.lang),
+        record.convertedFrom,
+        req.query.lang,
+      ),
     );
   });
 
   server.get("/item-details/:id", { schema: itemParams }, async (req, reply) => {
     const record = getSnapshot().records.get(req.params.id);
     if (record == null) return notFound(reply);
-    const details = await getItemDetails(record);
-    return sendJson(reply, localizeObject(details, req.query.lang));
+    const { convertedFrom, ...details } = await getItemDetails(record);
+    return sendJson(
+      reply,
+      withConvertedFrom(
+        localizeObject(details, req.query.lang),
+        convertedFrom,
+        req.query.lang,
+      ),
+    );
   });
 
   const query = (req, reply) => {
@@ -203,6 +215,17 @@ function shuffle(array) {
     .map((value) => ({ value, sort: Math.random() }))
     .sort((a, b) => a.sort - b.sort)
     .map(({ value }) => value);
+}
+
+/**
+ * Add the language the text was converted from, if it was converted for lang.
+ * @param {Object} body - localized response
+ * @param {Object.<string, string>} convertedFrom - e.g. { "zh-hk": "zh" }
+ * @param {string} [lang]
+ */
+function withConvertedFrom(body, convertedFrom, lang) {
+  const source = lang && convertedFrom[lang];
+  return source ? { ...body, convertedFrom: source } : body;
 }
 
 function notFound(reply, error = "Not found") {

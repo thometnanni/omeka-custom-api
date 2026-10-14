@@ -15,11 +15,12 @@ const inflight = new Map();
  * unknown ids never reach Omeka. Cached by id and modification date, so
  * editing an item invalidates its entry.
  * @param {{id:number, modified:string, item:{media?:number[]}}} record
- * @returns {Promise<{media:Object[]|null, html:*}>}
+ * @returns {Promise<{media:Object[]|null, html:*, convertedFrom:Object.<string, string>}>}
+ *   convertedFrom: languages of the html converted from the other Chinese script
  */
 export async function getItemDetails(record) {
   const ids = record.item.media ?? [];
-  if (ids.length === 0) return { media: null, html: null };
+  if (ids.length === 0) return { media: null, html: null, convertedFrom: {} };
 
   const key = `${record.id}:${record.modified}`;
   const cached = cache.get(key);
@@ -28,7 +29,7 @@ export async function getItemDetails(record) {
   if (!inflight.has(key)) {
     const request = omekaGet(`/media?id=${ids.join(",")}&per_page=${ids.length}`)
       .then(({ data }) =>
-        cache.set(key, { media: normalizeMedia(data), html: normalizeHtml(data) }),
+        cache.set(key, { media: normalizeMedia(data), ...normalizeHtml(data) }),
       )
       .finally(() => inflight.delete(key));
     inflight.set(key, request);

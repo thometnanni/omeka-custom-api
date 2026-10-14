@@ -19,6 +19,7 @@ const env = {
   FULL_SYNC_INTERVAL: 60 * 60 * 6, // seconds between full syncs
   RESPONSE_CACHE_MB: 64,
   MEDIA_CACHE_MB: 64,
+  SCRIPT_CACHE_MB: 64,
   ...process.env,
 };
 
@@ -33,6 +34,7 @@ const numeric = [
   "FULL_SYNC_INTERVAL",
   "RESPONSE_CACHE_MB",
   "MEDIA_CACHE_MB",
+  "SCRIPT_CACHE_MB",
 ];
 for (const key of numeric) env[key] = Number(env[key]);
 
@@ -55,4 +57,5 @@ export const {
   FULL_SYNC_INTERVAL,
   RESPONSE_CACHE_MB,
   MEDIA_CACHE_MB,
+  SCRIPT_CACHE_MB,
 } = env;
