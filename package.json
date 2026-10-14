@@ -7,14 +7,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "FEATURED_ITEM_SET=100 HEROES_ITEM_SET=200 node --test test/*.test.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
     "dotenv": "^17.2.1",
     "fastify": "^5.5.0",
-    "he": "^1.2.0",
-    "redis": "^5.8.2"
+    "he": "^1.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

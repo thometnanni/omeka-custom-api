@@ -1,5 +1,5 @@
 import he from "he";
-import { types, filterConfig } from "../types.js";
+import { types } from "../types.js";
 import { omitNullish } from "./helper.js";
 import { OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT } from "../env.js";
 
@@ -28,19 +28,6 @@ export function normalizeValue(property) {
   return safeTrim(property?.["@value"] ?? property);
 }
 
-/**
- * Normalize an Omeka reverse items objectinto an array of ids
- * @param {Object} reverse
- * @returns {[number]}
- */
-
-export function normalizeReverseItems(reverse) {
-  if (reverse == null) return null;
-
-  const items = Object.values(reverse).flat();
-
-  return items.map(({ "@id": id }) => +id.match(/[0-9]+$/g)?.[0]);
-}
 /**
  * Determine the content type key for an item by matching its @type to entries in `types`.
  * Returns a key like "creator", "objectType", etc., or "object" as a fallback.
@@ -83,7 +70,7 @@ export function normalizeMedia(items) {
           filename,
           url: overwriteFileUrl(url),
           type,
-          title: normalizeValue(title) ?? filename.replace(/^.+\//, ""),
+          title: normalizeValue(title) ?? filename?.replace(/^.+\//, ""),
         }),
     );
 
@@ -112,11 +99,15 @@ export function normalizeHtml(items) {
   return normalizeValue(htmlItems);
 }
 
-export function normalizeOmekaFields(
-  item,
-  filters,
-  include = { text: false, description: false, heroes: false, items: false },
-) {
+/**
+ * Normalize a raw Omeka item into the shape returned by the API.
+ * @param {Object} item - raw item from the API
+ * @param {(id:number, type:string) => ({title:*, id:number}|undefined)} resolveLink
+ *   - looks up a linked item of the given type
+ * @param {{description?:boolean, heroes?:boolean, items?:number[]}} [include]
+ * @returns {Object}
+ */
+export function normalizeOmekaFields(item, resolveLink, include = {}) {
   return omitNullish({
     id: item["o:id"],
     title: normalizeValue(item["dcterms:title"]),
@@ -125,7 +116,6 @@ export function normalizeOmekaFields(
     type: normalizeType(item),
     titleAlt: normalizeValue(item["dcterms:alternative"]),
     published: normalizeValue(item["dcterms:date"]),
-    text: include.text && normalizeValue(item["extracttext:extracted_text"]),
     media: item["o:media"]?.map((m) => m["o:id"]),
     thumbnail: overwriteFileUrl(item.thumbnail_display_urls?.medium),
     thumbnailLarge: overwriteFileUrl(item.thumbnail_display_urls?.large),
@@ -133,49 +123,16 @@ export function normalizeOmekaFields(
       item.thumbnail_display_urls?.medium && [
         overwriteFileUrl(item.thumbnail_display_urls?.medium),
       ],
-    items: include.items && normalizeReverseItems(item["@reverse"]),
+    items: include.items,
     isPart: item["dcterms:isPartOf"] != null || null,
     number: normalizeValue(item["curation:number"]),
-    ...resolveLinkedProperties(item, filters),
+    ...resolveLinkedProperties(item, resolveLink),
   });
 }
 
 export function normalizeHero(item) {
   return overwriteFileUrl(item.thumbnail_display_urls?.large);
 }
-/**
- * Generate counts for UI filters from a list of formatted items.
- * Returns an object keyed by filter name containing counts per filter value.
- * @param {Array} items - formatted items
- * @returns {Object.<string, Object.<string, number>>}
- */
-
-export function normalizeItemFilters(items) {
-  const itemFilters = Object.fromEntries(
-    Object.keys(filterConfig).map((key) => [key, {}]),
-  );
-
-  items.forEach((item) => {
-    Object.keys(types).forEach((key) => {
-      if (!item[key]) return;
-      item[key].forEach((filter) => {
-        const filterKey = filter.id ?? filter.value;
-
-        itemFilters[key][filterKey] = itemFilters[key][filterKey]
-          ? itemFilters[key][filterKey] + 1
-          : 1;
-      });
-    });
-
-    const year = item["dcterms:date"]?.[0]?.["@value"]?.split("-")[0];
-
-    itemFilters.year[year] = itemFilters.year[year]
-      ? itemFilters.year[year] + 1
-      : 1;
-  });
-  return itemFilters;
-}
-
 /**
  * Takes an omeka page array and returns title and html
  * @param {Object} pages
@@ -185,45 +142,42 @@ export function normalizePage(pages) {
   if (pages == null || pages.length < 1) return null;
   const page = pages[0];
   const title = page["o:title"];
-  const html =
-    page["o:block"] &&
-    page["o:block"].find((block) => block["o:layout"] === "html")?.["o:data"]
-      ?.html;
+  const html = page["o:block"]?.find((block) => block["o:layout"] === "html")?.[
+    "o:data"
+  ]?.html;
 
-  return { title, html: he.decode(html) };
+  return { title, html: html == null ? null : he.decode(html) };
 }
 
 /**
  * For each known linked type, map the raw item's linked resources to an array of {title,id}.
- * Uses the provided filters lookup to resolve canonical titles by resource id.
  * @param {Object} item - raw item from API
- * @param {Object} filters - lookup of available filters keyed by type name
+ * @param {(id:number, type:string) => ({title:*, id:number}|undefined)} resolveLink
  * @returns {Object.<string, Array<{title?:string,id?:*}>>}
  */
 
-export function resolveLinkedProperties(item, filters) {
+export function resolveLinkedProperties(item, resolveLink) {
   return Object.fromEntries(
     Object.entries(types).map(([name, type]) => {
-      const values = item[type.property]
-        ?.map(({ value_resource_id: value }) => {
-          const linkedItem = filters[name]?.find(({ id }) => id === value);
-
-          if (linkedItem == null) return;
-
-          const { title, id } = linkedItem;
-
-          return {
-            title,
-            id,
-          };
-        })
-        .filter(Boolean)
-        .filter(
-          ({ id }, i, props) => props.findIndex((p) => p.id === id) === i,
-        );
+      const values = linkedIds(item, type.property)
+        ?.map((id) => resolveLink(id, name))
+        .filter(Boolean);
       return [name, values];
     }),
   );
+}
+
+/**
+ * Unique ids of the items a raw item links to via a property.
+ * @param {Object} item - raw item from API
+ * @param {string} property - e.g. "dcterms:creator"
+ * @returns {number[]|undefined} undefined if the item has no such property
+ */
+export function linkedIds(item, property) {
+  const ids = item[property]
+    ?.map(({ value_resource_id: id }) => id)
+    .filter((id) => id != null);
+  return ids && [...new Set(ids)];
 }
 
 /**
@@ -246,19 +200,3 @@ export function overwriteFileUrl(url) {
   return url.replace(OMEKA_FILE_URL, OMEKA_FILE_URL_REPLACEMENT);
 }
 
-/**
- * takes a string of comma seperated strings and returns a filtered array of values, that are
- * - more than 3 characters
- * or
- * - chinese characters
- *
- * @param {string} searchString
- * @returns {[string]}
- */
-export function normalizeSearchString(searchString) {
-  return (
-    searchString
-      ?.split(",")
-      .filter((str) => str.length >= 3 || /\p{Script=Han}/u.test(str)) ?? []
-  ).sort();
-}

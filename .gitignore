@@ -15,3 +15,5 @@ dump.rdb
 # export
 
 export.json
+*.tmp
+export.pages.json
