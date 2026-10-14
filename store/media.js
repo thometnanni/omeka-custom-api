@@ -11,7 +11,7 @@ const cache = new LRU(
 const inflight = new Map();
 
 /**
- * Media and html blocks of an item. Only called for items in the snapshot, so
+ * Media and html blocks of an item, sent with /item. Only called for items in the snapshot, so
  * unknown ids never reach Omeka. Cached by id and modification date, so
  * editing an item invalidates its entry.
  * @param {{id:number, modified:string, item:{media?:number[]}}} record

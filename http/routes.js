@@ -94,32 +94,40 @@ export function routes(server) {
     });
   });
 
-  server.get("/item/:id", { schema: itemParams }, (req, reply) => {
-    const snapshot = getSnapshot();
-    const record = snapshot.records.get(req.params.id);
+  server.get("/item/:id", { schema: itemParams }, async (req, reply) => {
+    const { id } = req.params;
+    const { lang } = req.query;
+    const record = getSnapshot().records.get(id);
     if (record == null) return notFound(reply);
-    const key = cacheKey(`/item/${req.params.id}`, req.query);
-    return sendCached(req, reply, snapshot, key, () =>
-      withConvertedFrom(
-        localizeObject(snapshot.fullItem(req.params.id), req.query.lang),
-        record.convertedFrom,
-        req.query.lang,
-      ),
-    );
-  });
 
-  server.get("/item-details/:id", { schema: itemParams }, async (req, reply) => {
-    const record = getSnapshot().records.get(req.params.id);
-    if (record == null) return notFound(reply);
-    const { convertedFrom, ...details } = await getItemDetails(record);
-    return sendJson(
-      reply,
+    // media are fetched from Omeka on the first request, then cached until the item changes
+    let details;
+    let complete = true;
+    try {
+      details = await getItemDetails(record);
+    } catch (err) {
+      console.error(`Failed to fetch media of item ${id}:`, err);
+      details = { media: null, html: null, convertedFrom: {} };
+      complete = false;
+    }
+
+    const snapshot = getSnapshot();
+    const body = () =>
       withConvertedFrom(
-        localizeObject(details, req.query.lang),
-        convertedFrom,
-        req.query.lang,
-      ),
-    );
+        localizeObject(
+          { ...snapshot.fullItem(id), media: details.media, html: details.html },
+          lang,
+        ),
+        { ...details.convertedFrom, ...record.convertedFrom },
+        lang,
+      );
+
+    // don't cache responses without media, or with media of an outdated item
+    const current = snapshot.records.get(id);
+    if (!complete || current?.modified !== record.modified) {
+      return current ? sendJson(reply, body()) : notFound(reply);
+    }
+    return sendCached(req, reply, snapshot, cacheKey(`/item/${id}`, req.query), body);
   });
 
   const query = (req, reply) => {

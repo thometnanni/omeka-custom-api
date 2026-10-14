@@ -29,7 +29,6 @@ const paths = customPaths.length
       "/query/607?lang=en",
       "/item/5715?lang=en",
       "/item/3126?lang=zh",
-      "/item-details/5715?lang=en",
       "/page/about?lang=en",
       "/page/about?lang=zh",
       "/featured?lang=en",
