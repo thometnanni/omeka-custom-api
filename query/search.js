@@ -47,7 +47,8 @@ export function parseSearch(search) {
 
 /**
  * Score a record against all terms. Every term has to occur in at least one
- * field (AND); each field containing a term adds its weight.
+ * field (AND); each field containing a term adds its weight times the match
+ * quality (whole word > word start > substring).
  * @param {{search: Object.<string,string>}} record
  * @param {string[]} terms - folded terms
  * @returns {number} 0 when the record does not match
@@ -57,14 +58,77 @@ export function scoreRecord(record, terms) {
   for (const term of terms) {
     let termScore = 0;
     for (const field in SEARCH_WEIGHTS) {
-      if (record.search[field]?.includes(term)) {
-        termScore += SEARCH_WEIGHTS[field];
-      }
+      termScore += SEARCH_WEIGHTS[field] * matchQuality(record.search[field], term);
     }
     if (termScore === 0) return 0;
     score += termScore;
   }
   return score;
+}
+
+// factors of the match qualities
+const WORD = 1;
+const PREFIX = 0.5;
+const SUBSTRING = 0.2;
+
+/**
+ * Best match quality of a term in a text: WORD if it occurs as a whole word,
+ * PREFIX if at the start of a word, SUBSTRING otherwise, 0 if not at all.
+ * Checks at most `limit` occurrences.
+ * @param {string} [text] - folded text
+ * @param {string} term - folded term
+ * @param {number} [limit=100]
+ * @returns {number}
+ */
+export function matchQuality(text, term, limit = 100) {
+  if (!text) return 0;
+  let best = 0;
+  let index = text.indexOf(term);
+  for (let n = 0; index !== -1 && n < limit; n++) {
+    best = Math.max(best, qualityAt(text, index, term.length));
+    if (best === WORD) break;
+    index = text.indexOf(term, index + 1);
+  }
+  return best;
+}
+
+/**
+ * Match quality of an occurrence of a term in a text.
+ * @param {string} text
+ * @param {number} index - start of the occurrence
+ * @param {number} length - length of the term
+ * @returns {number}
+ */
+function qualityAt(text, index, length) {
+  const before =
+    isBoundary(text, index - 1) || isHan(text, index); // first char of the term
+  if (!before) return SUBSTRING;
+  const after =
+    isBoundary(text, index + length) || isHan(text, index + length - 1); // last char
+  return after ? WORD : PREFIX;
+}
+
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+const HAN_CHAR = /\p{Script=Han}/u;
+
+// Chinese has no spaces between words, so Han characters count as boundaries
+function isBoundary(text, index) {
+  if (index < 0 || index >= text.length) return true;
+  const char = charAt(text, index);
+  return !WORD_CHAR.test(char) || HAN_CHAR.test(char);
+}
+
+function isHan(text, index) {
+  return HAN_CHAR.test(charAt(text, index));
+}
+
+// the code point at a UTF-16 index, also if it points to the low surrogate
+function charAt(text, index) {
+  const code = text.charCodeAt(index);
+  if (code >= 0xdc00 && code <= 0xdfff && index > 0) {
+    return String.fromCodePoint(text.codePointAt(index - 1));
+  }
+  return String.fromCodePoint(text.codePointAt(index));
 }
 
 /**
@@ -103,16 +167,17 @@ export function extractSnippets(record, terms, max = 3) {
  * @returns {{term:string, snippet:string}[]}
  */
 function matchWithContext({ text, folded }, terms, max, context = 60) {
-  // the first `max` matches of each term are enough to find the first `max` overall
+  // collect several occurrences per term, then prefer whole words, then position
   const matches = [];
   for (const term of terms) {
     let index = folded.indexOf(term);
-    for (let n = 0; index !== -1 && n < max; n++) {
-      matches.push({ index, length: term.length });
+    for (let n = 0; index !== -1 && n < 20; n++) {
+      const quality = qualityAt(folded, index, term.length);
+      matches.push({ index, length: term.length, quality });
       index = folded.indexOf(term, index + term.length);
     }
   }
-  matches.sort((a, b) => a.index - b.index).splice(max);
+  matches.sort((a, b) => b.quality - a.quality || a.index - b.index).splice(max);
 
   // folding rarely changes the length; only map indices when it does
   const original =

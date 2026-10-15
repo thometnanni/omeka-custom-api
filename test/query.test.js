@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildSnapshot } from "../store/snapshot.js";
 import { queryItems } from "../query/items.js";
-import { fold, parseSearch, scoreRecord } from "../query/search.js";
+import { fold, matchQuality, parseSearch, scoreRecord } from "../query/search.js";
 import {
   items,
   CREATOR_A,
@@ -11,6 +11,7 @@ import {
   TYPE_NEWSLETTER,
   THEME_LABOR,
   PERIODICAL,
+  rawItem,
 } from "./fixture.js";
 
 const snapshot = buildSnapshot(items);
@@ -102,4 +103,43 @@ test("score is 0 unless every term matches", () => {
   const record = snapshot.records.get(40);
   assert.equal(scoreRecord(record, ["zebra", "missing"]), 0);
   assert.ok(scoreRecord(record, ["zebra"]) > scoreRecord(record, ["labor"]));
+});
+
+test("whole words rank above word starts and substrings", () => {
+  const ranking = buildSnapshot([
+    rawItem({ id: 1, type: "foaf:Person", title: "Brian Smith", created: 3 }),
+    rawItem({ id: 2, type: "foaf:Person", title: "Ianto Jones", created: 2 }),
+    rawItem({ id: 3, type: "foaf:Person", title: "Lee, Ian", created: 1 }),
+    rawItem({ id: 10, title: "Canadian archives", created: 10 }),
+    rawItem({ id: 11, title: "Letters", description: "Written by Ian Lee.", created: 9 }),
+    rawItem({
+      id: 12,
+      title: "Diaries",
+      text: "Brian wrote to his friend Ian.",
+      created: 8,
+    }),
+  ]);
+  const ids = (query) => queryItems(ranking, query).items.map(({ id }) => id);
+
+  assert.deepEqual(ids({ search: "ian", view: "creator" }), [3, 2, 1]);
+  // a description word match (2 × 1) beats a title substring match (5 × 0.2)
+  assert.deepEqual(ids({ search: "ian" }), [11, 10, 12]);
+  // still every term has to match
+  assert.deepEqual(ids({ search: "ian,letters" }), [11]);
+
+  // snippets prefer the whole word
+  const diaries = queryItems(ranking, { search: "ian" }).items.find(({ id }) => id === 12);
+  assert.equal(diaries.snippets[0].term, "Ian");
+  assert.equal(diaries.snippets[1].term, "ian");
+});
+
+test("match quality: word, prefix, substring, Chinese", () => {
+  assert.equal(matchQuality("lee, ian", "ian"), 1);
+  assert.equal(matchQuality("ianto jones", "ian"), 0.5);
+  assert.equal(matchQuality("brian smith", "ian"), 0.2);
+  assert.equal(matchQuality("brian and ian", "ian"), 1);
+  assert.equal(matchQuality("hong kong", "ian"), 0);
+  assert.equal(matchQuality("visit hong kong!", "hong kong"), 1);
+  // no spaces in Chinese: every occurrence counts as a word
+  assert.equal(matchQuality("我在香港工作", "香港"), 1);
 });
