@@ -4,26 +4,13 @@ services:
     container_name: cua_api
     restart: always
     env_file: .env
+    environment:
+      # keep the snapshot across deploys, so the API starts serving immediately
+      EXPORT_PATH: /app/data/export.json
     ports:
       - "8001:3000"
-    depends_on:
-      - cua_redis
-
-  cua_redis:
-    image: redis:8.6-alpine # official lightweight Redis image
-    container_name: cua_redis
-    restart: always
-    # Persist data between container restarts
     volumes:
-      - redis-data:/data
-    # Expose the port only if you need to reach Redis from the host
-    # (omit the next line for a pure internal service)
-    # ports:
-    #   - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - api-data:/app/data
+
 volumes:
-  redis-data:
+  api-data:

@@ -17,14 +17,3 @@ export const types = {
   },
   era: { term: "dctype:Event", property: "dcterms:coverage" },
 };
-
-/**
- * Filter configuration used to build query strings. Extends `types`.
- * year includes a searchType override.
- */
-
-export const filterConfig = {
-  ...types,
-  year: { property: "dcterms:date", searchType: "sw" },
-  search: { property: "0", searchType: "in" },
-};
