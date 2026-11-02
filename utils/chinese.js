@@ -15,9 +15,33 @@ export function hasHan(str) {
 }
 
 // s2hkp and hk2sp: character and phrase conversion
+const s2hkp = OpenCC.Converter({ from: "cn", to: "hkp" });
+const hk2sp = OpenCC.Converter({ from: "hkp", to: "cn" });
+
+// Mainland texts quote with “” and nest with ‘’, Hong Kong texts use 「」 and 『』.
+// Straight quotes are left alone, they also delimit html attributes.
+const CORNER_QUOTES = { "“": "「", "”": "」", "‘": "『", "’": "』" };
+const CURLY_QUOTES = Object.fromEntries(
+  Object.entries(CORNER_QUOTES).map(([curly, corner]) => [corner, curly]),
+);
+const LATIN = /\p{Script=Latin}/u;
+
+function toCornerQuotes(str) {
+  return str.replace(/[“”‘’]/g, (char, index) =>
+    // keep apostrophes in latin words, e.g. Mao’s
+    char === "’" && LATIN.test(str[index - 1] ?? "") && LATIN.test(str[index + 1] ?? "")
+      ? char
+      : CORNER_QUOTES[char],
+  );
+}
+
+function toCurlyQuotes(str) {
+  return str.replace(/[「」『』]/g, (char) => CURLY_QUOTES[char]);
+}
+
 const converters = {
-  "zh-hk": OpenCC.Converter({ from: "cn", to: "hkp" }),
-  zh: OpenCC.Converter({ from: "hkp", to: "cn" }),
+  "zh-hk": (str) => toCornerQuotes(s2hkp(str)),
+  zh: (str) => toCurlyQuotes(hk2sp(str)),
 };
 
 const sizeOf = (str) => str.length;
