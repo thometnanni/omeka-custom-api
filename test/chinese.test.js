@@ -39,6 +39,20 @@ test("s2hkp and hk2sp convert phrases", () => {
   assert.equal(convertTo("头发", "en"), "头发");
 });
 
+test("quotation marks follow the target script", () => {
+  assert.equal(convertTo("被打成“右派”的", "zh-hk"), "被打成「右派」的");
+  assert.equal(convertTo("唱：“太阳最红‘毛主席’”", "zh-hk"), "唱：「太陽最紅『毛主席』」");
+  assert.equal(convertTo("被打成「右派」的『书』", "zh"), "被打成“右派”的‘书’");
+  // apostrophes in latin words and straight quotes stay
+  assert.equal(
+    convertTo("《毛泽东最后的革命（Mao’s Last Revolution）》", "zh-hk"),
+    "《毛澤東最後的革命（Mao’s Last Revolution）》",
+  );
+  assert.equal(convertTo('<p class="x">“右派”</p>', "zh-hk"), '<p class="x">「右派」</p>');
+  // only converted text changes, authored zh-hk keeps its marks
+  assert.equal(localizeObject({ "zh-hk": "“全球中國”" }, "zh-hk"), "“全球中國”");
+});
+
 test("language maps get the missing Chinese script on sync", () => {
   const value = normalizeValue([
     { "@language": "en", "@value": "Hair" },
